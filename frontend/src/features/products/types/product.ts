@@ -47,7 +47,7 @@ export type ProductFilters = {
   search: string
   categoryId: string | 'all'
   productType: ProductType | 'all'
-  active: 'all' | 'active' | 'inactive'
+  active: 'all' | 'active' | 'inactive' | 'archived'
   branchId: string | null
   page: number
   perPage: number

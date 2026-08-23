@@ -21,3 +21,4 @@ Route::post('/products/upload-image', [ProductController::class, 'uploadImage'])
 Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::patch('/products/{product}', [ProductController::class, 'update']);
 Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+Route::post('/products/{id}/restore', [ProductController::class, 'restore']);

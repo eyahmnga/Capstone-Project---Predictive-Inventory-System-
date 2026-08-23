@@ -49,7 +49,9 @@ class ProductController extends Controller
             $query->where('barcode', $request->query('barcode'));
         }
 
-        if ($request->filled('isActive')) {
+        if ($request->boolean('isArchived') || $request->query('status') === 'archived') {
+            $query->onlyTrashed();
+        } elseif ($request->filled('isActive')) {
             $query->where('is_active', $request->boolean('isActive'));
         }
 
@@ -183,6 +185,17 @@ class ProductController extends Controller
         $this->productService->archive($product, $request->user());
 
         return response()->json(['data' => ['archived' => true]]);
+    }
+
+    public function restore(Request $request, int $id): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+
+        $product = $this->productService->unarchive($id, $request->user());
+
+        return response()->json([
+            'data' => new ProductResource($product->load(['category', 'stockUnit'])),
+        ]);
     }
 
     /**

@@ -17,7 +17,8 @@ export async function getProducts(filters: ProductFilters): Promise<PaginatedPro
       search: filters.search || undefined,
       categoryId: filters.categoryId === 'all' ? undefined : filters.categoryId,
       productType: filters.productType === 'all' ? undefined : filters.productType,
-      isActive: filters.active === 'all' ? undefined : filters.active === 'active',
+      isActive: filters.active === 'all' || filters.active === 'archived' ? undefined : filters.active === 'active',
+      isArchived: filters.active === 'archived' ? true : undefined,
       branchId: filters.branchId ?? undefined,
       page: filters.page,
       perPage: filters.perPage,
@@ -81,6 +82,11 @@ export async function uploadProductImage(file: File): Promise<{ url: string; pat
 
 export async function archiveProduct(product: Product): Promise<void> {
   await apiClient.delete(`/products/${product.id}`, { params: { version: product.version } })
+}
+
+export async function unarchiveProduct(productId: string): Promise<Product> {
+  const response = await apiClient.post<ApiEnvelope<Product>>(`/products/${productId}/restore`)
+  return response.data.data
 }
 
 export async function getCategoryOptions(): Promise<CategoryOption[]> {

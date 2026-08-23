@@ -1,13 +1,13 @@
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react'
-import { AlertOctagon, AlertTriangle, Boxes, FilterX, PackagePlus, Search } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, Archive, Boxes, FilterX, PackagePlus, RotateCcw, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { archiveProduct, createProduct, productQueryKeys, updateProduct } from '@/features/products/api/productsApi'
+import { archiveProduct, createProduct, productQueryKeys, unarchiveProduct, updateProduct } from '@/features/products/api/productsApi'
 import { ArchiveProductDialog } from '@/features/products/components/ArchiveProductDialog'
 import { ProductDetailsDrawer } from '@/features/products/components/ProductDetailsDrawer'
 import { ProductFormDialog } from '@/features/products/components/ProductFormDialog'
 import { ProductTable, type EnrichedProduct } from '@/features/products/components/ProductTable'
-import { type ComputedStockStatus } from '@/features/products/components/StockBadge'
+import { UnarchiveProductDialog } from '@/features/products/components/UnarchiveProductDialog'
 import { useCategoryOptions, useProducts, useUnitOptions } from '@/features/products/hooks/useProducts'
 import { useReorderPolicies, useRestockingAlerts } from '@/features/restocking/hooks/useRestocking'
 import { classifyProductStock } from '@/features/inventory/lib/stockClassification'
@@ -16,6 +16,7 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { type ApiError } from '@/shared/api/client'
 import { Button } from '@/shared/components/Button'
 import { PageHeader } from '@/shared/components/PageHeader'
+import { useToast } from '@/shared/components/Toast'
 import { cn } from '@/shared/lib/cn'
 
 const defaultFilters: ProductFilters = {
@@ -34,15 +35,19 @@ export default function ProductsPage() {
   const initialCategoryId = searchParams.get('categoryId') || 'all'
   const initialSearch = searchParams.get('search') || ''
   const stockStatusParam = searchParams.get('stockStatus') || 'all'
+  const tabParam = searchParams.get('view') === 'archived' ? 'archived' : 'active'
 
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>(tabParam)
   const [filters, setFilters] = useState<ProductFilters>(() => ({
     ...defaultFilters,
     categoryId: initialCategoryId,
     search: initialSearch,
+    active: tabParam === 'archived' ? 'archived' : 'all',
   }))
   const [stockStatusFilter, setStockStatusFilter] = useState<string>(stockStatusParam)
 
   const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
+  const { toast } = useToast()
 
   useEffect(() => {
     if (defaultBranchId && filters.branchId !== defaultBranchId) {
@@ -55,6 +60,9 @@ export default function ProductsPage() {
     const currentCategory = searchParams.get('categoryId') || 'all'
     const currentStockStatus = searchParams.get('stockStatus') || 'all'
     const currentSearch = searchParams.get('search') ?? ''
+    const currentView = searchParams.get('view') === 'archived' ? 'archived' : 'active'
+
+    setActiveTab(currentView)
     setStockStatusFilter(currentStockStatus)
     setFilters((state) => {
       let changed = false
@@ -67,6 +75,11 @@ export default function ProductsPage() {
         next.categoryId = currentCategory
         changed = true
       }
+      const targetActive = currentView === 'archived' ? 'archived' : (state.active === 'archived' ? 'all' : state.active)
+      if (next.active !== targetActive) {
+        next.active = targetActive
+        changed = true
+      }
       return changed ? next : state
     })
   }, [searchParams])
@@ -74,6 +87,7 @@ export default function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>()
   const [editingProduct, setEditingProduct] = useState<Product | undefined>()
   const [archivingProduct, setArchivingProduct] = useState<Product | undefined>()
+  const [unarchivingProduct, setUnarchivingProduct] = useState<Product | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
 
   const queryClient = useQueryClient()
@@ -96,31 +110,56 @@ export default function ProductsPage() {
     perPage: 100,
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: productQueryKeys.lists() })
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: productQueryKeys.lists() })
+  }
+
   const createMutation = useMutation({
     mutationFn: createProduct,
     onSuccess: () => {
-      void invalidate()
+      invalidate()
       setIsFormOpen(false)
-    },
-  })
-  const updateMutation = useMutation({
-    mutationFn: ({ product, values }: { product: Product; values: ProductFormValues }) => updateProduct(product, values),
-    onSuccess: () => {
-      void invalidate()
-      setIsFormOpen(false)
-      setEditingProduct(undefined)
-    },
-  })
-  const archiveMutation = useMutation({
-    mutationFn: archiveProduct,
-    onSuccess: () => {
-      void invalidate()
-      setArchivingProduct(undefined)
+      toast({ title: 'Product created', description: 'New product added to catalog.', variant: 'success' })
     },
   })
 
-  const error = (createMutation.error ?? updateMutation.error ?? archiveMutation.error ?? productsQuery.error) as ApiError | null
+  const updateMutation = useMutation({
+    mutationFn: ({ product, values }: { product: Product; values: ProductFormValues }) => updateProduct(product, values),
+    onSuccess: () => {
+      invalidate()
+      setIsFormOpen(false)
+      setEditingProduct(undefined)
+      toast({ title: 'Product updated', description: 'Product changes saved successfully.', variant: 'success' })
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: archiveProduct,
+    onSuccess: () => {
+      invalidate()
+      setArchivingProduct(undefined)
+      toast({
+        title: 'Product archived',
+        description: 'The product was moved to the Archived tab. You can unarchive it anytime.',
+        variant: 'success',
+      })
+    },
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (product: Product) => unarchiveProduct(product.id),
+    onSuccess: (restored) => {
+      invalidate()
+      setUnarchivingProduct(undefined)
+      toast({
+        title: 'Product restored',
+        description: `${restored.name} (${restored.sku}) is now active in the catalog!`,
+        variant: 'success',
+      })
+    },
+  })
+
+  const error = (createMutation.error ?? updateMutation.error ?? archiveMutation.error ?? unarchiveMutation.error ?? productsQuery.error) as ApiError | null
   const rawProducts = productsQuery.data?.data ?? []
   const categoryOptions = categoryOptionsQuery.data ?? []
   const unitOptions = unitOptionsQuery.data ?? []
@@ -162,6 +201,24 @@ export default function ProductsPage() {
   const updateFilter = <K extends keyof ProductFilters>(key: K, value: ProductFilters[K]) =>
     setFilters((state) => ({ ...state, [key]: value, page: key === 'page' ? Number(value) : 1 }))
 
+  const handleTabChange = (tab: 'active' | 'archived') => {
+    setActiveTab(tab)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'archived') {
+        next.set('view', 'archived')
+      } else {
+        next.delete('view')
+      }
+      return next
+    })
+    setFilters((state) => ({
+      ...state,
+      active: tab === 'archived' ? 'archived' : 'all',
+      page: 1,
+    }))
+  }
+
   const handleCategoryFilterChange = (categoryId: string) => {
     updateFilter('categoryId', categoryId)
     setSearchParams((prev) => {
@@ -201,6 +258,8 @@ export default function ProductsPage() {
   const save = (values: ProductFormValues) =>
     editingProduct ? updateMutation.mutate({ product: editingProduct, values }) : createMutation.mutate(values)
 
+  const isArchivedView = activeTab === 'archived'
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -221,6 +280,53 @@ export default function ProductsPage() {
           {error.requestId ? ` Request ID: ${error.requestId}` : ''}
         </div>
       ) : null}
+
+      {/* Top Catalog & Archive Navigation Tabs */}
+      <nav aria-label="Product views" className="flex gap-2 border-b border-border">
+        <button
+          className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+            activeTab === 'active'
+              ? 'border-brand-600 text-brand-700 font-bold'
+              : 'border-transparent text-muted hover:text-ink'
+          }`}
+          type="button"
+          onClick={() => handleTabChange('active')}
+        >
+          📦 Active Products
+        </button>
+
+        <button
+          className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'archived'
+              ? 'border-brand-600 text-brand-700 font-bold'
+              : 'border-transparent text-muted hover:text-ink'
+          }`}
+          type="button"
+          onClick={() => handleTabChange('archived')}
+        >
+          <Archive size={15} />
+          🗄️ Archived Products
+        </button>
+      </nav>
+
+      {/* Archived Notice Banner */}
+      {isArchivedView && (
+        <div className="flex items-center justify-between rounded-xl border border-slate-300 bg-slate-100/90 p-4 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
+              <Archive size={18} />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-slate-800">
+                Archived Products Storage
+              </p>
+              <p className="text-xs text-slate-600">
+                These products are retired from active sales. You can restore/unarchive any product anytime using the <strong>Unarchive</strong> button.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Controls Bar */}
       <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
@@ -276,18 +382,6 @@ export default function ProductsPage() {
           <option value="stock">Stock product</option>
           <option value="service">Service</option>
         </select>
-
-        {/* Active Status */}
-        <select
-          aria-label="Filter by active state"
-          className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-          value={filters.active}
-          onChange={(event) => updateFilter('active', event.target.value as ProductFilters['active'])}
-        >
-          <option value="all">All states</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
       </section>
 
       {/* Prominent Active Priority Banner */}
@@ -332,14 +426,21 @@ export default function ProductsPage() {
       {/* Counter & Status Header */}
       <div className="flex items-center justify-between text-sm text-muted">
         <p>
-          Showing {displayedProducts.length} of {productsQuery.data?.meta.total ?? rawProducts.length} products
+          Showing {displayedProducts.length} of {productsQuery.data?.meta.total ?? rawProducts.length} {isArchivedView ? 'archived' : 'active'} products
           {stockStatusFilter !== 'all' ? ` (${matchingCount} prioritized)` : ''}
         </p>
-        <p>{productsQuery.isFetching ? 'Updating…' : 'Live inventory evaluation'}</p>
+        <p>{productsQuery.isFetching ? 'Updating…' : 'Live catalog sync'}</p>
       </div>
 
       {/* Product Table with Priority Sorting & Highlighting */}
-      <ProductTable products={displayedProducts} onArchive={setArchivingProduct} onEdit={openEdit} onView={setSelectedProduct} />
+      <ProductTable
+        isArchivedView={isArchivedView}
+        products={displayedProducts}
+        onArchive={setArchivingProduct}
+        onEdit={openEdit}
+        onUnarchive={setUnarchivingProduct}
+        onView={setSelectedProduct}
+      />
 
       {/* Pagination */}
       <nav aria-label="Product pagination" className="flex items-center justify-between gap-3">
@@ -377,6 +478,14 @@ export default function ProductsPage() {
           product={archivingProduct}
           onClose={() => setArchivingProduct(undefined)}
           onConfirm={() => archiveMutation.mutate(archivingProduct)}
+        />
+      ) : null}
+      {unarchivingProduct ? (
+        <UnarchiveProductDialog
+          isRestoring={unarchiveMutation.isPending}
+          product={unarchivingProduct}
+          onClose={() => setUnarchivingProduct(undefined)}
+          onConfirm={() => unarchiveMutation.mutate(unarchivingProduct)}
         />
       ) : null}
     </div>

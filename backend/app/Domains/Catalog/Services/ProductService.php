@@ -61,6 +61,21 @@ class ProductService
         });
     }
 
+    public function unarchive(int $productId, User $actor): Product
+    {
+        return DB::transaction(function () use ($productId, $actor) {
+            $locked = Product::query()->onlyTrashed()->lockForUpdate()->findOrFail($productId);
+            $locked->deleted_by_user_id = null;
+            $locked->is_active = true;
+            $locked->row_version = $locked->row_version + 1;
+            $locked->deleted_at = null;
+            $locked->updated_by_user_id = $actor->id;
+            $locked->save();
+
+            return $locked;
+        });
+    }
+
     private function assertSkuAvailable(string $sku): void
     {
         if (Product::query()->withTrashed()->where('sku', $sku)->exists()) {
