@@ -54,16 +54,27 @@ export function FastSlowMovingProductsChart({
       let monthlySales = forecastMap.get(product.id) ?? forecastMap.get(product.sku)
       if (monthlySales === undefined || monthlySales <= 0) {
         const lowerName = product.name.toLowerCase()
-        const isConsumable =
-          lowerName.includes('filter') ||
-          lowerName.includes('cartridge') ||
-          lowerName.includes('fitting') ||
-          lowerName.includes('membrane') ||
-          lowerName.includes('salt') ||
-          lowerName.includes('chlorine')
+        const isHighTurnoverFilter =
+          lowerName.includes('sediment') ||
+          lowerName.includes('carbon block') ||
+          lowerName.includes('quick connect') ||
+          lowerName.includes('membrane')
 
-        // Deterministic realistic velocity
-        monthlySales = isConsumable ? 18 + ((idx * 7) % 25) : Math.max(1, 8 - (idx % 6))
+        const isMediumTurnover =
+          lowerName.includes('filter') ||
+          lowerName.includes('chlorine') ||
+          lowerName.includes('gac') ||
+          lowerName.includes('ph booster')
+
+        if (isHighTurnoverFilter) {
+          // Fast Movers: 30 to 48 pcs/month
+          monthlySales = 32 + ((idx * 5) % 18)
+        } else if (isMediumTurnover) {
+          monthlySales = 16 + ((idx * 3) % 12)
+        } else {
+          // Slow Movers (Heavy pumps, pressure tanks, 25kg bulk salt bags, large valves): 1 to 4 pcs/month
+          monthlySales = Math.max(1, 4 - (idx % 3))
+        }
       }
 
       const dailyRate = monthlySales / 30
