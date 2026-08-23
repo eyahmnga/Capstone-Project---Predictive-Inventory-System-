@@ -114,13 +114,13 @@ export const sidebarNavigation: SidebarNavigationConfig = {
           items: [
             {
               key: 'demand-forecast',
-              label: 'Demand Forecast',
+              label: 'Demand Forecast (SMA)',
               to: '/forecasting',
               permission: 'forecasting.read',
             },
             {
               key: 'reorder-planning',
-              label: 'Reorder Planning',
+              label: 'Reorder Planning (EOQ & ROP)',
               to: '/restocking',
               permission: 'restocking.read',
             },

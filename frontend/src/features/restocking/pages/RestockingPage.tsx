@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { PlusCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Calculator, PlusCircle, RefreshCw, ShoppingCart, TrendingUp } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProductOptions } from '@/features/products/hooks/useProducts'
@@ -35,9 +36,9 @@ import { PageHeader } from '@/shared/components/PageHeader'
 
 type Tab = 'policies' | 'alerts'
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'policies', label: 'Reorder policies' },
-  { id: 'alerts', label: 'Alerts' },
+const tabs: { id: Tab; label: string; badgeCount?: number }[] = [
+  { id: 'policies', label: 'Reorder Policies (ROP & EOQ)' },
+  { id: 'alerts', label: 'Restocking Alerts' },
 ]
 
 const defaultPolicyFilters: ReorderPolicyFilters = { branchId: null, page: 1, perPage: 10 }
@@ -102,21 +103,68 @@ export default function RestockingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        actions={tab === 'policies' && hasPermission('planning.rop.manage') ? (
-          <Button disabled={!branchId} onClick={() => setIsFormOpen(true)}><PlusCircle aria-hidden="true" size={18} /> New policy</Button>
-        ) : tab === 'alerts' && hasPermission('restocking.evaluate') ? (
-          <Button disabled={!branchId || evaluateMutation.isPending} onClick={() => evaluateMutation.mutate()}><RefreshCw aria-hidden="true" size={18} /> {evaluateMutation.isPending ? 'Evaluating…' : 'Evaluate now'}</Button>
-        ) : undefined}
-        description="Manage reorder points and review deduplicated restocking alerts."
-        title="Restocking"
+        actions={
+          tab === 'policies' && hasPermission('planning.rop.manage') ? (
+            <Button disabled={!branchId} onClick={() => setIsFormOpen(true)}>
+              <PlusCircle aria-hidden="true" size={18} /> New Reorder Policy
+            </Button>
+          ) : tab === 'alerts' && hasPermission('restocking.evaluate') ? (
+            <Button disabled={!branchId || evaluateMutation.isPending} onClick={() => evaluateMutation.mutate()}>
+              <RefreshCw aria-hidden="true" size={18} className={evaluateMutation.isPending ? 'animate-spin' : ''} />
+              {evaluateMutation.isPending ? 'Evaluating…' : 'Scan & Evaluate Alerts'}
+            </Button>
+          ) : undefined
+        }
+        description="Calculate Reorder Points (ROP) and Economic Order Quantities (EOQ) based on your SMA Demand Forecast."
+        title="Reorder Planning (EOQ & ROP)"
       />
-      {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
+
+      {error ? (
+        <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">
+          {error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}
+        </div>
+      ) : null}
+
+      {/* Connected Pipeline Step Banner */}
+      <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-white p-4 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shadow-xs">
+              <Calculator size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
+                  Step 2 of 2
+                </span>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Automate Reorder Timing (ROP) & Batch Sizing (EOQ)
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Using the predicted daily demand from <strong>SMA Forecasting</strong>, this module calculates the minimum threshold (<strong>ROP</strong>) and the most cost-effective replenishment batch (<strong>EOQ</strong>).
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/forecasting"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 transition shrink-0"
+          >
+            <ArrowLeft size={14} />
+            <TrendingUp className="text-blue-600" size={15} />
+            Review Step 1: Demand Forecast (SMA)
+          </Link>
+        </div>
+      </div>
 
       <nav aria-label="Restocking sections" className="flex gap-1 border-b border-border">
         {tabs.map((item) => (
           <button
             key={item.id}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${tab === item.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-muted hover:text-ink'}`}
+            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+              tab === item.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-muted hover:text-ink'
+            }`}
             type="button"
             onClick={() => setTab(item.id)}
           >
@@ -127,30 +175,49 @@ export default function RestockingPage() {
 
       {tab === 'policies' ? (
         <div className="space-y-4">
-          <p className="text-sm text-muted">{policiesQuery.data?.meta.total ?? 0} reorder policies {policiesQuery.isFetching ? '· Updating…' : ''}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-700">
+              {policiesQuery.data?.meta.total ?? 0} Product Reorder Policies {policiesQuery.isFetching ? '· Updating…' : ''}
+            </p>
+            <span className="text-xs text-slate-400">Click the panel icon on any row to calculate EOQ</span>
+          </div>
           <ReorderPolicyTable policies={policiesQuery.data?.data ?? []} onView={(policy) => setSelectedPolicyId(policy.id)} />
         </div>
       ) : null}
 
       {tab === 'alerts' ? (
         <div className="space-y-4">
-          <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-2">
-            <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={alertFilters.status} onChange={(event) => setAlertFilters((state) => ({ ...state, status: event.target.value as AlertStatus | 'all', page: 1 }))}>
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="acknowledged">Acknowledged</option>
-              <option value="resolved">Resolved</option>
-              <option value="dismissed">Dismissed</option>
-            </select>
-            <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={alertFilters.severity} onChange={(event) => setAlertFilters((state) => ({ ...state, severity: event.target.value as AlertSeverity | 'all', page: 1 }))}>
-              <option value="all">All severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+          <section className="grid gap-3 rounded-xl border border-border bg-surface p-4 shadow-2xs sm:p-5 md:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-muted block mb-1">Filter by Status</label>
+              <select
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600/30"
+                value={alertFilters.status}
+                onChange={(event) => setAlertFilters((state) => ({ ...state, status: event.target.value as AlertStatus | 'all', page: 1 }))}
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active (Needs Attention)</option>
+                <option value="acknowledged">Acknowledged</option>
+                <option value="resolved">Resolved</option>
+                <option value="dismissed">Dismissed</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted block mb-1">Filter by Severity</label>
+              <select
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600/30"
+                value={alertFilters.severity}
+                onChange={(event) => setAlertFilters((state) => ({ ...state, severity: event.target.value as AlertSeverity | 'all', page: 1 }))}
+              >
+                <option value="all">All severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
           </section>
-          <p className="text-sm text-muted">{alertsQuery.data?.meta.total ?? 0} alerts {alertsQuery.isFetching ? '· Updating…' : ''}</p>
+          <p className="text-sm text-muted">{alertsQuery.data?.meta.total ?? 0} active alerts {alertsQuery.isFetching ? '· Updating…' : ''}</p>
           <AlertTable alerts={alertsQuery.data?.data ?? []} onView={(alert) => setSelectedAlertId(alert.id)} />
         </div>
       ) : null}
