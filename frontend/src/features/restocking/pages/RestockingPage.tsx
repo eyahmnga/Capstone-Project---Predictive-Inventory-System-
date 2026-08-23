@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Calculator, PlusCircle, RefreshCw, ShoppingCart, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Calculator, PlusCircle, RefreshCw, ShieldAlert, ShoppingCart, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
@@ -36,9 +36,9 @@ import { PageHeader } from '@/shared/components/PageHeader'
 
 type Tab = 'policies' | 'alerts'
 
-const tabs: { id: Tab; label: string; badgeCount?: number }[] = [
-  { id: 'policies', label: 'Reorder Policies (ROP & EOQ)' },
-  { id: 'alerts', label: 'Restocking Alerts' },
+const tabs: { id: Tab; label: string }[] = [
+  { id: 'policies', label: '1. Reorder Planning (ROP & EOQ Rules)' },
+  { id: 'alerts', label: '2. Restock Alerts & Actions' },
 ]
 
 const defaultPolicyFilters: ReorderPolicyFilters = { branchId: null, page: 1, perPage: 10 }
@@ -99,6 +99,7 @@ export default function RestockingPage() {
   const error = (createPolicyMutation.error ?? recalculateMutation.error ?? eoqMutation.error ?? evaluateMutation.error ?? acknowledgeMutation.error ?? resolveMutation.error ?? dismissMutation.error) as ApiError | null
 
   const branchId = policyFilters.branchId
+  const activeAlertsCount = alertsQuery.data?.data?.filter((a) => a.status === 'active').length ?? 0
 
   return (
     <div className="space-y-6">
@@ -115,46 +116,66 @@ export default function RestockingPage() {
             </Button>
           ) : undefined
         }
-        description="Calculate Reorder Points (ROP) and Economic Order Quantities (EOQ) based on your SMA Demand Forecast."
+        description="Determines exactly WHEN to reorder (ROP) and HOW MUCH to buy (EOQ) to minimize costs and prevent stockouts."
         title="Reorder Planning (EOQ & ROP)"
       />
 
       {error ? (
         <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">
-          {error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}
+          {error.message}
         </div>
       ) : null}
 
-      {/* Connected Pipeline Step Banner */}
-      <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-white p-4 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shadow-xs">
-              <Calculator size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">
-                  Step 2 of 2
-                </span>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Automate Reorder Timing (ROP) & Batch Sizing (EOQ)
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Using the predicted daily demand from <strong>SMA Forecasting</strong>, this module calculates the minimum threshold (<strong>ROP</strong>) and the most cost-effective replenishment batch (<strong>EOQ</strong>).
-              </p>
-            </div>
+      {/* 3 Straightforward Concept Summary Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 font-bold text-xs">
+              1
+            </span>
+            <span className="text-xs font-semibold text-slate-500">Reorder Point (ROP)</span>
           </div>
+          <p className="mt-2 text-sm font-bold text-slate-800">
+            Answers: &quot;WHEN to Order?&quot;
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            ROP = (Daily SMA Demand &times; Lead Time) + Safety Stock
+          </p>
+        </div>
 
-          <Link
-            to="/forecasting"
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 transition shrink-0"
-          >
-            <ArrowLeft size={14} />
-            <TrendingUp className="text-blue-600" size={15} />
-            Review Step 1: Demand Forecast (SMA)
-          </Link>
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 font-bold text-xs">
+              2
+            </span>
+            <span className="text-xs font-semibold text-slate-500">Economic Order Qty (EOQ)</span>
+          </div>
+          <p className="mt-2 text-sm font-bold text-emerald-700">
+            Answers: &quot;HOW MUCH to Order?&quot;
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Calculates the most cost-effective batch to save on shipping & holding fees.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600 font-bold text-xs">
+                3
+              </span>
+              <span className="text-xs font-semibold text-slate-500">Live Status</span>
+            </div>
+            <span className="text-xs font-bold text-amber-700 font-mono">
+              {activeAlertsCount} Low Stock Alert(s)
+            </span>
+          </div>
+          <p className="mt-2 text-sm font-bold text-slate-800">
+            Restock Actions Ready
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            1-click conversion into Purchase Orders directly from recommended EOQ.
+          </p>
         </div>
       </div>
 
@@ -163,7 +184,7 @@ export default function RestockingPage() {
           <button
             key={item.id}
             className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
-              tab === item.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-muted hover:text-ink'
+              tab === item.id ? 'border-brand-600 text-brand-700 font-bold' : 'border-transparent text-muted hover:text-ink'
             }`}
             type="button"
             onClick={() => setTab(item.id)}
@@ -177,9 +198,11 @@ export default function RestockingPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-700">
-              {policiesQuery.data?.meta.total ?? 0} Product Reorder Policies {policiesQuery.isFetching ? '· Updating…' : ''}
+              Product Reorder Policies ({policiesQuery.data?.meta.total ?? 0} active products) {policiesQuery.isFetching ? '· Updating…' : ''}
             </p>
-            <span className="text-xs text-slate-400">Click the panel icon on any row to calculate EOQ</span>
+            <Link to="/forecasting" className="text-xs font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
+              <ArrowLeft size={13} /> Review SMA Demand Forecast
+            </Link>
           </div>
           <ReorderPolicyTable policies={policiesQuery.data?.data ?? []} onView={(policy) => setSelectedPolicyId(policy.id)} />
         </div>
@@ -196,7 +219,7 @@ export default function RestockingPage() {
                 onChange={(event) => setAlertFilters((state) => ({ ...state, status: event.target.value as AlertStatus | 'all', page: 1 }))}
               >
                 <option value="all">All statuses</option>
-                <option value="active">Active (Needs Attention)</option>
+                <option value="active">Active (Needs Immediate Restocking)</option>
                 <option value="acknowledged">Acknowledged</option>
                 <option value="resolved">Resolved</option>
                 <option value="dismissed">Dismissed</option>
@@ -210,14 +233,14 @@ export default function RestockingPage() {
                 onChange={(event) => setAlertFilters((state) => ({ ...state, severity: event.target.value as AlertSeverity | 'all', page: 1 }))}
               >
                 <option value="all">All severities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
+                <option value="critical">Critical (Out of Stock)</option>
+                <option value="high">High (Below ROP)</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
             </div>
           </section>
-          <p className="text-sm text-muted">{alertsQuery.data?.meta.total ?? 0} active alerts {alertsQuery.isFetching ? '· Updating…' : ''}</p>
+          <p className="text-sm text-muted">{alertsQuery.data?.meta.total ?? 0} total alert records {alertsQuery.isFetching ? '· Updating…' : ''}</p>
           <AlertTable alerts={alertsQuery.data?.data ?? []} onView={(alert) => setSelectedAlertId(alert.id)} />
         </div>
       ) : null}
