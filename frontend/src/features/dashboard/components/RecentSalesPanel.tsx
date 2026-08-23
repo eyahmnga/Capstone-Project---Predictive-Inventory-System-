@@ -1,6 +1,7 @@
 import { Receipt } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { RecentSaleItem } from '@/features/dashboard/types/dashboard'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 export function RecentSalesPanel({ sales }: { sales: RecentSaleItem[] }) {
   return (
@@ -26,7 +27,7 @@ export function RecentSalesPanel({ sales }: { sales: RecentSaleItem[] }) {
                 <p className="mt-1 truncate text-sm text-muted">{sale.cashierName ?? 'Unknown cashier'}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold tabular-nums text-ink">{sale.totalAmount}</p>
+                <p className="text-sm font-semibold tabular-nums text-ink">{formatQuantity(sale.totalAmount)}</p>
                 <time className="text-xs text-muted">{sale.soldAt ? new Date(sale.soldAt).toLocaleTimeString() : '—'}</time>
               </div>
             </li>

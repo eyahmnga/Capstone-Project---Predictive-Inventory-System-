@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
+import { TrendingUp } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
+import { MetricCard } from '@/features/dashboard/components/MetricCard'
+import { RecentSalesPanel } from '@/features/dashboard/components/RecentSalesPanel'
+import { SalesTrendTable } from '@/features/dashboard/components/SalesTrendTable'
 import { getSale, refundSale, saleQueryKeys, voidSale } from '@/features/sales/api/salesApi'
 import { SaleDetailsDrawer } from '@/features/sales/components/SaleDetailsDrawer'
 import { SaleTable } from '@/features/sales/components/SaleTable'
@@ -24,6 +29,7 @@ export default function SalesPage() {
   }, [defaultBranchId])
 
   const salesQuery = useSales(filters)
+  const dashboardQuery = useDashboard(defaultBranchId)
   const selectedSaleQuery = useQuery({
     queryKey: saleQueryKeys.detail(selectedSaleId ?? ''),
     queryFn: () => getSale(selectedSaleId as string),
@@ -48,8 +54,27 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader description="Review completed sales, then void or refund as authorized." title="Sales" />
+      <PageHeader description="Review completed sales, track sales trends, and void or refund as authorized." title="Sales" />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
+
+      {/* Relocated Sales Today Metric, Recent Sales, and Sales Trend */}
+      {dashboardQuery.data ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard
+              icon={<TrendingUp aria-hidden="true" size={22} />}
+              isCurrency
+              metric={dashboardQuery.data.data.kpis.salesToday}
+              tone="success"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <RecentSalesPanel sales={dashboardQuery.data.data.recentSales} />
+            <SalesTrendTable points={dashboardQuery.data.data.salesTrend} />
+          </div>
+        </div>
+      ) : null}
 
       <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_200px]">
         <input className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" placeholder="Search by sale number" value={filters.saleNumber} onChange={(event) => setFilters((state) => ({ ...state, saleNumber: event.target.value, page: 1 }))} />

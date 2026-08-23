@@ -4,7 +4,7 @@ import { cn } from '@/shared/lib/cn'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
-  size?: 'default' | 'icon'
+  size?: 'default' | 'sm' | 'icon'
   asChild?: boolean
 }
 
@@ -27,6 +27,7 @@ export function Button({
     // Cursor is intentionally not set here: the base `button:not(:disabled)` rule
     // in index.css owns it, so disabled buttons correctly keep the default arrow.
     'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold outline-none transition-colors motion-reduce:transition-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+    size === 'sm' && 'min-h-9 h-9 px-3 text-xs rounded-lg',
     size === 'icon' && 'h-11 w-11 min-h-11 px-0',
     variants[variant],
     className,

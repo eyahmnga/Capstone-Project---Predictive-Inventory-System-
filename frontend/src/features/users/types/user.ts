@@ -40,6 +40,7 @@ export type UserFormValues = {
   lastName: string
   email: string
   phone: string
+  avatarUrl: string | null
   roleIds: string[]
   branchIds: string[]
   defaultBranchId: string

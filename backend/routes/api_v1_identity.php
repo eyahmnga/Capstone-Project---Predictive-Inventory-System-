@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/users', [UserController::class, 'index']);
 Route::post('/users', [UserController::class, 'store']);
+Route::post('/users/upload-avatar', [UserController::class, 'uploadAvatar']);
 Route::get('/users/{user}', [UserController::class, 'show']);
 Route::patch('/users/{user}', [UserController::class, 'update']);
 

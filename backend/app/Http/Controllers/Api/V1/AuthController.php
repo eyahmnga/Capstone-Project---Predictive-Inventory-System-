@@ -63,6 +63,59 @@ class AuthController extends Controller
         return new AuthSessionResource($user->load('branches'));
     }
 
+    public function uploadAvatar(Request $request): JsonResponse
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp,svg', 'max:5120'],
+        ]);
+
+        $file = $request->file('avatar');
+        $filename = (string) Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('avatars', $filename, 'public');
+
+        $url = asset('storage/' . $path);
+
+        return response()->json([
+            'data' => [
+                'url' => $url,
+                'path' => $path,
+            ],
+        ]);
+    }
+
+    public function updateProfile(Request $request): AuthSessionResource
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'firstName' => ['sometimes', 'string', 'max:100'],
+            'lastName' => ['sometimes', 'string', 'max:100'],
+            'phone' => ['nullable', 'string', 'max:48'],
+            'avatarUrl' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        if (isset($validated['firstName'])) {
+            $user->first_name = $validated['firstName'];
+        }
+        if (isset($validated['lastName'])) {
+            $user->last_name = $validated['lastName'];
+        }
+        if (isset($validated['firstName']) || isset($validated['lastName'])) {
+            $user->display_name = trim($user->first_name . ' ' . $user->last_name);
+        }
+        if (array_key_exists('phone', $validated)) {
+            $user->phone = $validated['phone'];
+        }
+        if (array_key_exists('avatarUrl', $validated)) {
+            $user->avatar_url = $validated['avatarUrl'];
+        }
+
+        $user->save();
+
+        return new AuthSessionResource($user->load('branches'));
+    }
+
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $throttleKey = 'forgot-password:'.mb_strtolower($request->string('email'));

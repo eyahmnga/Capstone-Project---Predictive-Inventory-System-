@@ -1,37 +1,93 @@
-import { Archive, Edit3 } from 'lucide-react'
+import { Archive, Edit3, Package, PackagePlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { Category } from '@/features/categories/types/category'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
 
 const statusBadge = (isActive: boolean) => (
-  <span className={isActive ? 'inline-flex rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success-text' : 'inline-flex rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-muted'}>
+  <span
+    className={
+      isActive
+        ? 'inline-flex rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success-text'
+        : 'inline-flex rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-muted'
+    }
+  >
     {isActive ? 'Active' : 'Inactive'}
   </span>
 )
 
-export function CategoryTable({ categories, onEdit, onArchive }: { categories: Category[]; onEdit: (category: Category) => void; onArchive: (category: Category) => void }) {
+type CategoryTableProps = {
+  categories: Category[]
+  onEdit: (category: Category) => void
+  onArchive: (category: Category) => void
+  onAddProduct?: (category: Category) => void
+}
+
+export function CategoryTable({ categories, onEdit, onArchive, onAddProduct }: CategoryTableProps) {
   return (
     <>
+      {/* Mobile Card View */}
       <div className="space-y-3 md:hidden">
         {categories.length === 0 ? (
-          <p className="rounded-card border border-border bg-surface p-6 text-center text-sm text-muted shadow-panel">No categories match these filters.</p>
+          <p className="rounded-card border border-border bg-surface p-6 text-center text-sm text-muted shadow-panel">
+            No categories match these filters.
+          </p>
         ) : (
           categories.map((category) => (
             <RecordCard
               key={category.id}
               badge={statusBadge(category.isActive)}
-              title={category.name}
+              title={
+                <Link
+                  className="font-semibold text-ink transition hover:text-brand-600 hover:underline"
+                  title={`View products in ${category.name}`}
+                  to={`/products?categoryId=${category.id}`}
+                >
+                  {category.name}
+                </Link>
+              }
               subtitle={category.description ?? undefined}
               fields={[
                 { label: 'Code', value: <span className="font-mono">{category.code}</span> },
                 { label: 'Parent', value: category.parentName ?? 'Top level' },
-                { label: 'Products', value: category.productCount },
+                {
+                  label: 'Products',
+                  value: (
+                    <Link
+                      className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+                      to={`/products?categoryId=${category.id}`}
+                    >
+                      <Package size={14} />
+                      {category.productCount} products
+                    </Link>
+                  ),
+                },
               ]}
               actions={
                 <>
-                  <Button aria-label={`Edit ${category.name}`} size="icon" variant="ghost" onClick={() => onEdit(category)}><Edit3 aria-hidden="true" size={16} /></Button>
-                  <Button aria-label={`Archive ${category.name}`} size="icon" variant="ghost" onClick={() => onArchive(category)}><Archive aria-hidden="true" size={16} /></Button>
+                  {onAddProduct && (
+                    <Button
+                      aria-label={`Add product in ${category.name}`}
+                      size="icon"
+                      title="Add product to this category"
+                      variant="ghost"
+                      onClick={() => onAddProduct(category)}
+                    >
+                      <PackagePlus aria-hidden="true" size={16} />
+                    </Button>
+                  )}
+                  <Button aria-label={`Edit ${category.name}`} size="icon" variant="ghost" onClick={() => onEdit(category)}>
+                    <Edit3 aria-hidden="true" size={16} />
+                  </Button>
+                  <Button
+                    aria-label={`Archive ${category.name}`}
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onArchive(category)}
+                  >
+                    <Archive aria-hidden="true" size={16} />
+                  </Button>
                 </>
               }
             />
@@ -39,6 +95,7 @@ export function CategoryTable({ categories, onEdit, onArchive }: { categories: C
         )}
       </div>
 
+      {/* Desktop Table View */}
       <div className="hidden md:block">
         <Table minWidth={800}>
           <TableHead>
@@ -58,17 +115,63 @@ export function CategoryTable({ categories, onEdit, onArchive }: { categories: C
               categories.map((category) => (
                 <TableRow key={category.id}>
                   <TableCell>
-                    <p className="font-semibold text-ink">{category.name}</p>
-                    {category.description ? <p className="mt-1 text-xs text-muted">{category.description}</p> : null}
+                    <Link
+                      className="group/cat block text-left outline-none"
+                      title={`View all products in ${category.name}`}
+                      to={`/products?categoryId=${category.id}`}
+                    >
+                      <p className="font-semibold text-ink group-hover/cat:text-brand-600 group-hover/cat:underline transition">
+                        {category.name}
+                      </p>
+                      {category.description ? (
+                        <p className="mt-0.5 text-xs text-muted">{category.description}</p>
+                      ) : null}
+                    </Link>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted">{category.code}</TableCell>
                   <TableCell className="text-muted">{category.parentName ?? 'Top level'}</TableCell>
-                  <TableCell align="right" className="text-ink">{category.productCount}</TableCell>
+                  <TableCell align="right">
+                    <Link
+                      className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800 transition hover:bg-brand-50 hover:text-brand-700"
+                      title={`View ${category.productCount} product(s) in ${category.name}`}
+                      to={`/products?categoryId=${category.id}`}
+                    >
+                      <Package size={13} className="text-slate-400" />
+                      {category.productCount}
+                    </Link>
+                  </TableCell>
                   <TableCell>{statusBadge(category.isActive)}</TableCell>
                   <TableCell align="right">
                     <div className="flex justify-end gap-1">
-                      <Button aria-label={`Edit ${category.name}`} size="icon" variant="ghost" onClick={() => onEdit(category)}><Edit3 aria-hidden="true" size={16} /></Button>
-                      <Button aria-label={`Archive ${category.name}`} size="icon" variant="ghost" onClick={() => onArchive(category)}><Archive aria-hidden="true" size={16} /></Button>
+                      {onAddProduct && (
+                        <Button
+                          aria-label={`Add product in ${category.name}`}
+                          size="icon"
+                          title="Add product to this category"
+                          variant="ghost"
+                          onClick={() => onAddProduct(category)}
+                        >
+                          <PackagePlus aria-hidden="true" size={16} />
+                        </Button>
+                      )}
+                      <Button
+                        aria-label={`Edit ${category.name}`}
+                        size="icon"
+                        title="Edit category"
+                        variant="ghost"
+                        onClick={() => onEdit(category)}
+                      >
+                        <Edit3 aria-hidden="true" size={16} />
+                      </Button>
+                      <Button
+                        aria-label={`Archive ${category.name}`}
+                        size="icon"
+                        title="Archive category"
+                        variant="ghost"
+                        onClick={() => onArchive(category)}
+                      >
+                        <Archive aria-hidden="true" size={16} />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

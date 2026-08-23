@@ -5,6 +5,7 @@ import type { RestockingAlert } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 export function AlertTable({ alerts, onView }: { alerts: RestockingAlert[]; onView: (alert: RestockingAlert) => void }) {
   return (
@@ -22,9 +23,9 @@ export function AlertTable({ alerts, onView }: { alerts: RestockingAlert[]; onVi
               subtitle={<span className="font-mono">{alert.productSku}</span>}
               fields={[
                 { label: 'Status', value: <AlertStatusBadge status={alert.status} />, full: true },
-                { label: 'Available', value: alert.availableQuantitySnapshot },
-                { label: 'Reorder point', value: alert.reorderPointSnapshot },
-                { label: 'Recommended order', value: alert.recommendedOrderQuantity ?? '—', full: true },
+                { label: 'Available', value: formatQuantity(alert.availableQuantitySnapshot) },
+                { label: 'Reorder point', value: formatQuantity(alert.reorderPointSnapshot) },
+                { label: 'Recommended order', value: formatQuantity(alert.recommendedOrderQuantity), full: true },
               ]}
               onClick={() => onView(alert)}
             />
@@ -57,9 +58,9 @@ export function AlertTable({ alerts, onView }: { alerts: RestockingAlert[]; onVi
                   </TableCell>
                   <TableCell><SeverityBadge severity={alert.severity} /></TableCell>
                   <TableCell><AlertStatusBadge status={alert.status} /></TableCell>
-                  <TableCell align="right">{alert.availableQuantitySnapshot}</TableCell>
-                  <TableCell align="right">{alert.reorderPointSnapshot}</TableCell>
-                  <TableCell align="right" className="font-semibold text-ink">{alert.recommendedOrderQuantity ?? '—'}</TableCell>
+                  <TableCell align="right">{formatQuantity(alert.availableQuantitySnapshot)}</TableCell>
+                  <TableCell align="right">{formatQuantity(alert.reorderPointSnapshot)}</TableCell>
+                  <TableCell align="right" className="font-semibold text-ink">{formatQuantity(alert.recommendedOrderQuantity)}</TableCell>
                   <TableCell align="right">
                     <div className="flex justify-end gap-1">
                       <Button aria-label={`View alert for ${alert.productName}`} size="icon" variant="ghost" onClick={() => onView(alert)}><PanelRightOpen aria-hidden="true" size={18} /></Button>

@@ -6,6 +6,7 @@ import { GoodsReceiptStatusBadge } from '@/features/receiving/components/GoodsRe
 import { ReasonPromptDialog } from '@/features/receiving/components/ReasonPromptDialog'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type GoodsReceiptDetailsDrawerProps = {
@@ -41,9 +42,9 @@ export function GoodsReceiptDetailsDrawer({ goodsReceipt: receipt, isActing, onC
                   <p className="font-medium text-ink">{line.productName}</p>
                   <p className="text-xs text-muted">{line.productSku}</p>
                   <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div><dt className="text-muted">Received</dt><dd className="tabular-nums text-ink">{line.receivedQuantity}</dd></div>
-                    <div><dt className="text-muted">Accepted</dt><dd className="tabular-nums text-ink">{line.acceptedQuantity}</dd></div>
-                    <div><dt className="text-muted">Rejected</dt><dd className="tabular-nums text-ink">{line.rejectedQuantity}</dd></div>
+                    <div><dt className="text-muted">Received</dt><dd className="tabular-nums text-ink">{formatQuantity(line.receivedQuantity)}</dd></div>
+                    <div><dt className="text-muted">Accepted</dt><dd className="tabular-nums text-ink">{formatQuantity(line.acceptedQuantity)}</dd></div>
+                    <div><dt className="text-muted">Rejected</dt><dd className="tabular-nums text-ink">{formatQuantity(line.rejectedQuantity)}</dd></div>
                   </dl>
                 </div>
               ))}
@@ -55,9 +56,9 @@ export function GoodsReceiptDetailsDrawer({ goodsReceipt: receipt, isActing, onC
                   {receipt.lines.map((line) => (
                     <tr key={line.id}>
                       <td className="px-3 py-2"><p className="font-medium text-ink">{line.productName}</p><p className="text-xs text-muted">{line.productSku}</p></td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.receivedQuantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.acceptedQuantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.rejectedQuantity}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.receivedQuantity)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.acceptedQuantity)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.rejectedQuantity)}</td>
                     </tr>
                   ))}
                 </tbody>

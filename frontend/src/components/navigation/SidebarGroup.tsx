@@ -24,19 +24,24 @@ export function SidebarGroup({ group, isExpanded, isSidebarExpanded, onToggle, o
         aria-label={group.ariaLabel ?? `Toggle ${group.label}`}
         className={cn(
           'flex h-11 w-full items-center rounded-lg px-3 text-left outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-info',
-          isExpanded ? 'bg-white/[0.07] text-white' : 'text-white/60 hover:bg-white/5 hover:text-white',
+          isExpanded ? 'bg-white/[0.08] text-white font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white',
         )}
+        title={!isSidebarExpanded ? group.label : undefined}
         type="button"
         onClick={() => onToggle(group.key)}
       >
-        <GroupIcon aria-hidden="true" className="shrink-0" size={18} />
+        <GroupIcon
+          aria-hidden="true"
+          className={cn('shrink-0 transition-colors', isExpanded ? 'text-blue-300' : 'text-white/70')}
+          size={18}
+        />
 
         {isSidebarExpanded ? (
           <>
             <span className="ml-3 min-w-0 flex-1 truncate text-sm font-semibold">{group.label}</span>
             <ChevronDown
               aria-hidden="true"
-              className={cn('ml-2 shrink-0 transition-transform duration-300 ease-out', isExpanded && 'rotate-180')}
+              className={cn('ml-2 shrink-0 text-white/50 transition-transform duration-300 ease-out', isExpanded && 'rotate-180 text-white/90')}
               size={16}
             />
           </>

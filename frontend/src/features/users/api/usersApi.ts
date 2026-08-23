@@ -32,6 +32,7 @@ export async function createUser(values: UserFormValues): Promise<ManagedUser> {
     lastName: values.lastName,
     email: values.email,
     phone: values.phone || undefined,
+    avatarUrl: values.avatarUrl || undefined,
     roleIds: values.roleIds,
     branchIds: values.branchIds,
     defaultBranchId: values.defaultBranchId,
@@ -45,13 +46,41 @@ export async function updateUser(user: ManagedUser, values: UserFormValues): Pro
     firstName: values.firstName,
     lastName: values.lastName,
     email: values.email,
-    phone: values.phone || undefined,
+    phone: values.phone || null,
+    avatarUrl: values.avatarUrl || null,
     roleIds: values.roleIds,
     branchIds: values.branchIds,
     defaultBranchId: values.defaultBranchId,
     isActive: values.isActive,
     version: user.version,
   })
+  return response.data.data
+}
+
+export async function uploadUserAvatar(file: File): Promise<{ url: string; path: string }> {
+  const formData = new FormData()
+  formData.append('avatar', file)
+  const response = await apiClient.post<{ data: { url: string; path: string } }>('/users/upload-avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return response.data.data
+}
+
+export async function uploadMyAvatar(file: File): Promise<{ url: string; path: string }> {
+  const formData = new FormData()
+  formData.append('avatar', file)
+  const response = await apiClient.post<{ data: { url: string; path: string } }>('/auth/avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return response.data.data
+}
+
+export async function updateMyProfile(values: { firstName?: string; lastName?: string; phone?: string | null; avatarUrl?: string | null }) {
+  const response = await apiClient.patch<{ data: unknown }>('/auth/profile', values)
   return response.data.data
 }
 

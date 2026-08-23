@@ -17,6 +17,7 @@ Route::patch('/units-of-measure/{unit}', [UnitOfMeasureController::class, 'updat
 
 Route::get('/products', [ProductController::class, 'index']);
 Route::post('/products', [ProductController::class, 'store']);
+Route::post('/products/upload-image', [ProductController::class, 'uploadImage']);
 Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::patch('/products/{product}', [ProductController::class, 'update']);
 Route::delete('/products/{product}', [ProductController::class, 'destroy']);

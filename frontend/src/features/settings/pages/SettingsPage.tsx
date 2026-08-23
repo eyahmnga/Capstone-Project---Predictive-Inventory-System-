@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
+import { SyncHealthPanel } from '@/features/dashboard/components/SyncHealthPanel'
 import { settingsQueryKeys, updateSetting } from '@/features/settings/api/settingsApi'
 import { SettingEditDialog } from '@/features/settings/components/SettingEditDialog'
 import { SettingsTable } from '@/features/settings/components/SettingsTable'
@@ -10,9 +12,12 @@ import { type ApiError } from '@/shared/api/client'
 import { PageHeader } from '@/shared/components/PageHeader'
 
 export default function SettingsPage() {
-  const { hasPermission } = useAuth()
+  const { session, hasPermission } = useAuth()
   const [selectedKey, setSelectedKey] = useState<string | undefined>()
   const queryClient = useQueryClient()
+
+  const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
+  const dashboardQuery = useDashboard(defaultBranchId)
 
   const settingsQuery = useSettings(null)
   const selected = settingsQuery.data?.find((setting) => setting.key === selectedKey)
@@ -29,8 +34,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader description="Typed, versioned system configuration. Owner-only and sensitive values are marked and protected." title="Settings" />
+      <PageHeader description="Typed, versioned system configuration and offline synchronization status." title="Settings & Administration" />
       {error && !updateMutation.isPending ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
+
+      {/* Relocated Sync Health Panel */}
+      {dashboardQuery.data ? (
+        <SyncHealthPanel health={dashboardQuery.data.data.syncHealth} />
+      ) : null}
 
       <SettingsTable canManage={hasPermission('settings.manage')} settings={settingsQuery.data ?? []} onEdit={(setting: Setting) => setSelectedKey(setting.key)} />
 

@@ -18,6 +18,8 @@ class SaleResource extends JsonResource
         return [
             'id' => (string) $sale->id,
             'branchId' => (string) $sale->branch_id,
+            'branchName' => $sale->relationLoaded('branch') && $sale->branch ? $sale->branch->name : null,
+            'branchCode' => $sale->relationLoaded('branch') && $sale->branch ? $sale->branch->code : null,
             'saleNumber' => $sale->sale_number,
             'status' => $sale->status,
             'currencyCode' => $sale->currency_code,

@@ -22,6 +22,7 @@ class StoreProductRequest extends FormRequest
             'barcode' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'imageUrl' => ['nullable', 'string', 'max:2048'],
             'productType' => ['required', 'string', Rule::in(Product::TYPES)],
             'isActive' => ['sometimes', 'boolean'],
             'isLotTracked' => ['sometimes', 'boolean'],

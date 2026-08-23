@@ -74,10 +74,10 @@ export function AdjustmentFormDialog({ productOptions, isSaving, onClose, onSave
                       </select>
                     </label>
                     <label className="text-xs font-semibold text-muted">Delta
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" placeholder="±0.0000" required step="0.0001" type="number" value={line.quantityDelta} onChange={(event) => updateLine(index, { quantityDelta: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" placeholder="±0.00" required step="0.01" type="number" value={line.quantityDelta} onChange={(event) => updateLine(index, { quantityDelta: event.target.value })} />
                     </label>
-                    <label className="text-xs font-semibold text-muted">Unit cost
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" step="0.0001" type="number" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value })} />
+                    <label className="text-xs font-semibold text-muted">Unit cost (₱)
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" placeholder="0.00" step="0.01" type="number" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value })} />
                     </label>
                     <label className="text-xs font-semibold text-muted">Line note
                       <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" value={line.notes} onChange={(event) => updateLine(index, { notes: event.target.value })} />

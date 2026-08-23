@@ -1,6 +1,7 @@
 import type { InventoryMovement } from '@/features/inventory/types/inventory'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 const movementTypeLabels: Record<InventoryMovement['movementType'], string> = {
   receipt: 'Receipt',
@@ -28,8 +29,8 @@ export function InventoryMovementTable({ movements }: { movements: InventoryMove
                 title={movement.product?.name ?? '—'}
                 subtitle={<span className="font-mono">{movement.product?.sku ?? '—'}</span>}
                 fields={[
-                  { label: 'Quantity', value: <span className={`font-semibold ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>{isPositive ? '+' : ''}{movement.quantityDelta}</span> },
-                  { label: 'Balance after', value: movement.onHandAfterQuantity ?? '—' },
+                  { label: 'Quantity', value: <span className={`font-semibold ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>{isPositive ? '+' : ''}{formatQuantity(movement.quantityDelta)}</span> },
+                  { label: 'Balance after', value: formatQuantity(movement.onHandAfterQuantity) },
                   { label: 'Reference', value: <span className="font-mono text-xs">{movement.referenceType} #{movement.referenceId}</span>, full: true },
                   { label: 'Actor', value: movement.actor?.displayName ?? '—' },
                   { label: 'Effective', value: movement.effectiveAt ? new Date(movement.effectiveAt).toLocaleString() : '—' },
@@ -67,9 +68,9 @@ export function InventoryMovementTable({ movements }: { movements: InventoryMove
                     </TableCell>
                     <TableCell className="text-muted">{movementTypeLabels[movement.movementType]}</TableCell>
                     <TableCell align="right" className={`font-semibold ${isPositive ? 'text-success-text' : 'text-danger-text'}`}>
-                      {isPositive ? '+' : ''}{movement.quantityDelta}
+                      {isPositive ? '+' : ''}{formatQuantity(movement.quantityDelta)}
                     </TableCell>
-                    <TableCell align="right" className="text-muted">{movement.onHandAfterQuantity ?? '—'}</TableCell>
+                    <TableCell align="right" className="text-muted">{formatQuantity(movement.onHandAfterQuantity)}</TableCell>
                     <TableCell className="font-mono text-xs text-muted">{movement.referenceType} #{movement.referenceId}</TableCell>
                     <TableCell className="text-muted">{movement.actor?.displayName ?? '—'}</TableCell>
                     <TableCell className="text-muted">{movement.effectiveAt ? new Date(movement.effectiveAt).toLocaleString() : '—'}</TableCell>

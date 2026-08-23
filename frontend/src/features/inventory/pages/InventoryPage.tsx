@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PackagePlus } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useProductOptions } from '@/features/products/hooks/useProducts'
@@ -48,11 +49,18 @@ const defaultAdjustmentFilters: InventoryAdjustmentFilters = { branchId: null, s
 
 export default function InventoryPage() {
   const { session, hasPermission } = useAuth()
-  const [tab, setTab] = useState<Tab>('balances')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const tabParam = searchParams.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(
+    tabParam === 'adjustments' || tabParam === 'movements' || tabParam === 'balances' ? tabParam : 'balances',
+  )
   const [balanceFilters, setBalanceFilters] = useState<InventoryBalanceFilters>(defaultBalanceFilters)
   const [movementFilters, setMovementFilters] = useState<InventoryMovementFilters>(defaultMovementFilters)
   const [adjustmentFilters, setAdjustmentFilters] = useState<InventoryAdjustmentFilters>(defaultAdjustmentFilters)
-  const [selectedAdjustmentId, setSelectedAdjustmentId] = useState<string | undefined>()
+  const [selectedAdjustmentId, setSelectedAdjustmentId] = useState<string | undefined>(
+    searchParams.get('adjustmentId') ?? undefined,
+  )
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [queuedMessage, setQueuedMessage] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -60,6 +68,20 @@ export default function InventoryPage() {
   const { toast } = useToast()
 
   const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
+
+  // Synchronize URL search params (e.g. ?tab=adjustments&adjustmentId=123)
+  useEffect(() => {
+    const currentTab = searchParams.get('tab') as Tab | null
+    if (currentTab === 'adjustments' || currentTab === 'movements' || currentTab === 'balances') {
+      setTab(currentTab)
+    }
+    const currentAdjId = searchParams.get('adjustmentId')
+    if (currentAdjId) {
+      setSelectedAdjustmentId(currentAdjId)
+      setTab('adjustments')
+    }
+  }, [searchParams])
+
   useEffect(() => {
     if (!defaultBranchId) return
     setBalanceFilters((state) => (state.branchId === defaultBranchId ? state : { ...state, branchId: defaultBranchId }))
@@ -75,11 +97,6 @@ export default function InventoryPage() {
     queryKey: ['offline-product-cache', session?.user.id],
     queryFn: () => getCachedProducts(session?.user.id as string),
     enabled: !isOnline && session?.user.id !== undefined,
-    // This reads IndexedDB, not the network — without this, TanStack
-    // Query's own online-manager (which listens to the same native
-    // online/offline events as useOnlineStatus) pauses the query
-    // whenever the browser is offline, which is exactly when it's
-    // needed.
     networkMode: 'always',
   })
   const productOptions = isOnline ? (productOptionsQuery.data ?? []) : (offlineProductOptionsQuery.data ?? [])
@@ -98,54 +115,34 @@ export default function InventoryPage() {
 
   const createMutation = useMutation({
     mutationFn: async (values: AdjustmentFormValues): Promise<InventoryAdjustment | null> => {
-      const branchId = adjustmentFilters.branchId as string
-
-      if (!isOnline) {
-        const userId = session?.user.id
-        if (!userId) throw new Error('No active session to queue this adjustment against.')
-
-        // Queued, never shown as a finalized record — the Adjustments
-        // list only ever reflects server-accepted state
-        // (DEVELOPMENT_ROADMAP.md M9 acceptance criteria).
+      if (!isOnline && defaultBranchId && session) {
+        const clientOperationId = crypto.randomUUID()
         await syncCoordinator.enqueue({
-          clientOperationId: crypto.randomUUID(),
-          userId,
-          operationType: 'inventory_adjustment.create',
-          branchId,
+          clientOperationId,
+          userId: session.user.id,
+          operationType: 'inventory.adjustment.create',
+          branchId: defaultBranchId,
           payloadVersion: 1,
           idempotencyKey: crypto.randomUUID(),
           dependencyOperationId: null,
-          payload: {
-            reasonCode: values.reasonCode,
-            reasonNote: values.reasonNote || undefined,
-            effectiveAt: values.effectiveAt,
-            lines: values.lines.map((line) => ({
-              productId: line.productId,
-              quantityDelta: line.quantityDelta,
-              unitCost: line.unitCost || undefined,
-              notes: line.notes || undefined,
-            })),
-          },
-          summary: `Adjustment: ${values.lines.length} line${values.lines.length === 1 ? '' : 's'} (${values.reasonCode})`,
+          payload: { ...values, branchId: defaultBranchId },
+          summary: `Inventory adjustment (${values.reasonCode})`,
         })
+        setQueuedMessage('Adjustment queued locally. It will sync automatically when back online.')
+        setIsFormOpen(false)
         return null
       }
-
-      return createInventoryAdjustment(branchId, values)
+      return createInventoryAdjustment(defaultBranchId as string, values)
     },
-    onSuccess: (result) => {
-      if (result === null) {
-        setQueuedMessage('Adjustment queued on this device — it will sync automatically once you are back online.')
-      } else {
+    onSuccess: (adjustment) => {
+      if (adjustment) {
         invalidate()
+        setIsFormOpen(false)
+        toast({ title: 'Adjustment draft created', description: adjustment.adjustmentNumber, variant: 'success' })
       }
-      setIsFormOpen(false)
     },
-    // The offline branch only writes to IndexedDB; without this,
-    // TanStack Query's online-manager pauses the mutation entirely while
-    // the browser is offline, so it would never even run.
-    networkMode: 'always',
   })
+
   const approveMutation = useMutation({
     mutationFn: (adjustment: InventoryAdjustment) => approveInventoryAdjustment(adjustment),
     onSuccess: (adjustment) => { invalidate(); toast({ title: 'Adjustment approved', description: adjustment.adjustmentNumber, variant: 'success' }) },
@@ -163,6 +160,37 @@ export default function InventoryPage() {
   const error = (createMutation.error ?? approveMutation.error ?? postMutation.error ?? reverseMutation.error) as ApiError | null
 
   const branchId = balanceFilters.branchId
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', newTab)
+      if (newTab !== 'adjustments') {
+        next.delete('adjustmentId')
+      }
+      return next
+    })
+  }
+
+  const handleCloseDrawer = () => {
+    setSelectedAdjustmentId(undefined)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('adjustmentId')
+      return next
+    })
+  }
+
+  const handleViewAdjustment = (adjustment: InventoryAdjustment) => {
+    setSelectedAdjustmentId(adjustment.id)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', 'adjustments')
+      next.set('adjustmentId', adjustment.id)
+      return next
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -183,7 +211,7 @@ export default function InventoryPage() {
             key={item.id}
             className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${tab === item.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-muted hover:text-ink'}`}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => handleTabChange(item.id)}
           >
             {item.label}
           </button>
@@ -200,7 +228,7 @@ export default function InventoryPage() {
               <option value="out_of_stock">Out of stock</option>
             </select>
           </section>
-          <p className="text-sm text-muted">{balancesQuery.data?.meta.total ?? 0} products {balancesQuery.isFetching ? '· Updating…' : ''}</p>
+          <p className="text-sm text-muted">{balancesQuery.data?.meta.total ?? 0} balances {balancesQuery.isFetching ? '· Updating…' : ''}</p>
           <InventoryBalanceTable balances={balancesQuery.data?.data ?? []} />
         </div>
       ) : null}
@@ -210,13 +238,13 @@ export default function InventoryPage() {
           <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[220px]">
             <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={movementFilters.movementType} onChange={(event) => setMovementFilters((state) => ({ ...state, movementType: event.target.value as MovementType | 'all', page: 1 }))}>
               <option value="all">All movement types</option>
-              <option value="receipt">Receipt</option>
-              <option value="sale">Sale</option>
-              <option value="adjustment">Adjustment</option>
-              <option value="return">Return</option>
-              <option value="reservation">Reservation</option>
-              <option value="release">Release</option>
-              <option value="reversal">Reversal</option>
+              <option value="receipt">Receipts</option>
+              <option value="sale">Sales</option>
+              <option value="adjustment">Adjustments</option>
+              <option value="return">Returns</option>
+              <option value="reservation">Reservations</option>
+              <option value="release">Releases</option>
+              <option value="reversal">Reversals</option>
             </select>
           </section>
           <p className="text-sm text-muted">{movementsQuery.data?.meta.total ?? 0} movements {movementsQuery.isFetching ? '· Updating…' : ''}</p>
@@ -235,7 +263,7 @@ export default function InventoryPage() {
             </select>
           </section>
           <p className="text-sm text-muted">{adjustmentsQuery.data?.meta.total ?? 0} adjustments {adjustmentsQuery.isFetching ? '· Updating…' : ''}</p>
-          <AdjustmentTable adjustments={adjustmentsQuery.data?.data ?? []} onView={(adjustment) => setSelectedAdjustmentId(adjustment.id)} />
+          <AdjustmentTable adjustments={adjustmentsQuery.data?.data ?? []} onView={handleViewAdjustment} />
         </div>
       ) : null}
 
@@ -247,7 +275,7 @@ export default function InventoryPage() {
           adjustment={selectedAdjustmentQuery.data}
           isActing={isActing}
           onApprove={() => approveMutation.mutate(selectedAdjustmentQuery.data)}
-          onClose={() => setSelectedAdjustmentId(undefined)}
+          onClose={handleCloseDrawer}
           onPost={() => postMutation.mutate(selectedAdjustmentQuery.data)}
           onReverse={(reason) => reverseMutation.mutate({ adjustment: selectedAdjustmentQuery.data, reason })}
         />

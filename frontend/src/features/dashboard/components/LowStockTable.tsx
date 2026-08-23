@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { LowStockItem } from '@/features/dashboard/types/dashboard'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
 
 type LowStockTableProps = { items: LowStockItem[] }
@@ -51,7 +52,7 @@ export function LowStockTable({ items }: LowStockTableProps) {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-ink">{item.productName}</p>
                   <p className="truncate font-mono text-xs text-muted">{item.productSku}</p>
-                  <p className="mt-1 text-xs text-muted">Available <span className="font-semibold text-ink">{item.availableQuantity}</span> · Reorder point {item.reorderPointQuantity}</p>
+                  <p className="mt-1 text-xs text-muted">Available <span className="font-semibold text-ink">{formatQuantity(item.availableQuantity)}</span> · Reorder point {formatQuantity(item.reorderPointQuantity)}</p>
                 </div>
                 <div className="shrink-0">{severityPill(item.severity)}</div>
               </li>
@@ -80,8 +81,8 @@ export function LowStockTable({ items }: LowStockTableProps) {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium text-ink">{item.productName}</TableCell>
                   <TableCell className="font-mono text-xs text-muted">{item.productSku}</TableCell>
-                  <TableCell align="right" className="font-semibold text-ink">{item.availableQuantity}</TableCell>
-                  <TableCell align="right" className="text-muted">{item.reorderPointQuantity}</TableCell>
+                  <TableCell align="right" className="font-semibold text-ink">{formatQuantity(item.availableQuantity)}</TableCell>
+                  <TableCell align="right" className="text-muted">{formatQuantity(item.reorderPointQuantity)}</TableCell>
                   <TableCell>{severityPill(item.severity)}</TableCell>
                 </TableRow>
               ))

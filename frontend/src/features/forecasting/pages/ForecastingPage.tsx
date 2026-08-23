@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { PlayCircle } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
+import { ForecastSummaryPanel } from '@/features/dashboard/components/ForecastSummaryPanel'
 import { createForecastRun, forecastQueryKeys, getForecastRun, recordManualPlan } from '@/features/forecasting/api/forecastApi'
 import { ForecastRunDetailsDrawer } from '@/features/forecasting/components/ForecastRunDetailsDrawer'
 import { ForecastRunFormDialog } from '@/features/forecasting/components/ForecastRunFormDialog'
@@ -28,6 +30,7 @@ export default function ForecastingPage() {
   }, [defaultBranchId])
 
   const runsQuery = useForecastRuns(filters)
+  const dashboardQuery = useDashboard(filters.branchId ?? undefined)
   const selectedRunQuery = useQuery({
     queryKey: forecastQueryKeys.detail(selectedRunId ?? ''),
     queryFn: () => getForecastRun(selectedRunId as string),
@@ -62,6 +65,13 @@ export default function ForecastingPage() {
         title="Forecasting"
       />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
+
+      {/* Relocated Forecast Coverage Panel */}
+      {dashboardQuery.data ? (
+        <ForecastSummaryPanel
+          summary={dashboardQuery.data.data.forecastSummary}
+        />
+      ) : null}
 
       <p className="text-sm text-muted">{runsQuery.data?.meta.total ?? 0} forecast runs {runsQuery.isFetching ? '· Updating…' : ''}</p>
       <ForecastRunTable runs={runsQuery.data?.data ?? []} onView={(run) => setSelectedRunId(run.id)} />

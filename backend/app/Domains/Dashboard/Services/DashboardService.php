@@ -112,7 +112,7 @@ class DashboardService
             ->whereHas('reorderPolicy', fn ($query) => $query->where('branch_id', $branchId))
             ->where('status', 'active')
             ->with('reorderPolicy.product')
-            ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderBy('available_quantity_snapshot')
             ->limit(10)
             ->get()

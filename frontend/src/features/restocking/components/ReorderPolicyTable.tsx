@@ -3,6 +3,7 @@ import type { ReorderPolicy } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 const stateBadge = (isActive: boolean) => (
   <span className={isActive ? 'inline-flex rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success-text' : 'inline-flex rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-muted'}>
@@ -25,9 +26,9 @@ export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPoli
               title={policy.productName ?? '—'}
               subtitle={<span className="font-mono">{policy.productSku}</span>}
               fields={[
-                { label: 'Safety stock', value: policy.safetyStockQuantity },
+                { label: 'Safety stock', value: formatQuantity(policy.safetyStockQuantity) },
                 { label: 'Lead time (days)', value: policy.leadTimeDaysOverride ?? '—' },
-                { label: 'Reorder point', value: policy.reorderPointQuantity ?? 'Not calculated', full: true },
+                { label: 'Reorder point', value: policy.reorderPointQuantity ? formatQuantity(policy.reorderPointQuantity) : 'Not calculated', full: true },
               ]}
               onClick={() => onView(policy)}
             />
@@ -57,9 +58,9 @@ export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPoli
                     <p className="font-medium text-ink">{policy.productName ?? '—'}</p>
                     <p className="font-mono text-xs text-muted">{policy.productSku}</p>
                   </TableCell>
-                  <TableCell align="right">{policy.safetyStockQuantity}</TableCell>
+                  <TableCell align="right">{formatQuantity(policy.safetyStockQuantity)}</TableCell>
                   <TableCell align="right">{policy.leadTimeDaysOverride ?? '—'}</TableCell>
-                  <TableCell align="right" className="font-semibold text-ink">{policy.reorderPointQuantity ?? 'Not calculated'}</TableCell>
+                  <TableCell align="right" className="font-semibold text-ink">{policy.reorderPointQuantity ? formatQuantity(policy.reorderPointQuantity) : 'Not calculated'}</TableCell>
                   <TableCell>
                     <span className={policy.isActive ? 'text-sm font-medium text-success-text' : 'text-sm font-medium text-muted'}>
                       {policy.isActive ? 'Active' : 'Inactive'}

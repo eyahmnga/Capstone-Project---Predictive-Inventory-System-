@@ -11,6 +11,7 @@ use App\Domains\Identity\Models\User;
 use App\Domains\Inventory\Services\GoodsReceiptService;
 use App\Domains\Inventory\Services\InventoryAdjustmentService;
 use App\Domains\Planning\Models\ReorderPolicy;
+use App\Domains\Planning\Services\EoqService;
 use App\Domains\Planning\Services\RestockingAlertService;
 use App\Domains\Planning\Services\SmaForecastService;
 use App\Domains\Procurement\Models\PurchaseOrder;
@@ -22,13 +23,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Populates every transactional domain with realistic, mutually consistent
- * demo data for local development and CI only. Every workflow-driven record
- * (purchase orders, goods receipts, inventory adjustments, sales) is created
- * by calling the real domain services rather than raw inserts, so the
- * resulting movements, balances, and audit-log rows are exactly what the
- * app itself would have produced (CLAUDE.md section 8's single source of
- * truth applies to seed data too).
+ * Populates every transactional domain with realistic, comprehensive
+ * water-treatment demo data across 5 distinct categories (25 products total),
+ * showcasing SMA demand forecasting, EOQ optimization, Reorder Policies,
+ * and active Low Stock, Out of Stock, and Overstock states.
  */
 class DemoDataSeeder extends Seeder
 {
@@ -38,13 +36,13 @@ class DemoDataSeeder extends Seeder
             return;
         }
 
-        // Idempotency guard: skip the whole pass if it has already run.
+        // Idempotency guard: skip if already populated
         if (Product::query()->where('sku', 'SHX-FLT-001')->exists()) {
             return;
         }
 
         $branch = Branch::query()->where('code', 'MAIN')->firstOrFail();
-        $unit = UnitOfMeasure::query()->where('code', 'EA')->firstOrFail();
+        $units = UnitOfMeasure::query()->get()->keyBy('code');
         $owner = User::query()
             ->where('email', env('OWNER_SEED_EMAIL', 'owner@stevenhydrotech.example'))
             ->firstOrFail();
@@ -52,12 +50,12 @@ class DemoDataSeeder extends Seeder
         $users = $this->seedDemoUsers($branch);
         $categories = $this->seedCategories();
         $suppliers = $this->seedSuppliers();
-        $products = $this->seedProducts($categories, $unit);
+        $products = $this->seedProducts($categories, $units);
 
-        $this->seedPurchaseOrdersAndReceipts($branch, $suppliers, $products, $users['manager'], $owner, $unit);
+        $this->seedPurchaseOrdersAndReceipts($branch, $suppliers, $products, $users['manager'], $owner, $units);
         $this->seedInventoryAdjustments($branch, $products, $users['manager'], $owner);
-        $this->seedSales($branch, $products, $users['staffOne'], $users['staffTwo'], $unit);
-        $this->seedReorderPolicies($branch, $products, $users['manager']);
+        $this->seedSales($branch, $products, $users['staffOne'], $users['staffTwo'], $units);
+        $this->seedReorderPoliciesAndEoq($branch, $products, $users['manager']);
 
         app(RestockingAlertService::class)->evaluateAll($branch->id);
 
@@ -108,14 +106,11 @@ class DemoDataSeeder extends Seeder
     private function seedCategories(): array
     {
         $definitions = [
-            'FILT' => ['name' => 'Filter Cartridges', 'description' => 'Sediment, carbon, and post-filter cartridges.'],
-            'MEMB' => ['name' => 'RO Membranes', 'description' => 'Reverse osmosis membrane elements.'],
-            'UV' => ['name' => 'UV Sterilizers & Lamps', 'description' => 'Ultraviolet disinfection systems and replacement lamps.'],
-            'TANK' => ['name' => 'Storage Tanks', 'description' => 'Pressure and atmospheric water storage tanks.'],
-            'DISP' => ['name' => 'Water Dispensers', 'description' => 'Countertop and floor-standing water dispensers.'],
-            'FITT' => ['name' => 'Fittings & Valves', 'description' => 'Quick-connect fittings, valves, and adapters.'],
-            'CHEM' => ['name' => 'Chemicals & Media', 'description' => 'Filter media and water treatment chemicals.'],
-            'ACC' => ['name' => 'Accessories & Parts', 'description' => 'Tools and spare parts for installation and maintenance.'],
+            'FILT' => ['name' => 'Water Filtration & Cartridges', 'description' => 'Sediment filters, carbon blocks, and reverse osmosis membrane elements.'],
+            'CHEM' => ['name' => 'Water Treatment Chemicals', 'description' => 'Disinfectants, coagulants, pH adjusters, and softening salts.'],
+            'PUMP' => ['name' => 'Pumps & Pressure Tanks', 'description' => 'Booster pumps, diaphragm pumps, pressure vessels, and flow controllers.'],
+            'FITT' => ['name' => 'Fittings, Valves & Pipes', 'description' => 'Push-fit connectors, solenoid valves, check valves, and pressure gauges.'],
+            'TEST' => ['name' => 'Water Testing & Instruments', 'description' => 'Digital TDS meters, pH testing drops, hardness test kits, and flow meters.'],
         ];
 
         $categories = [];
@@ -135,19 +130,23 @@ class DemoDataSeeder extends Seeder
     private function seedSuppliers(): array
     {
         $definitions = [
-            'AQUAPH' => 'AquaPure Philippines Inc.',
-            'CRYSTALWTR' => 'Crystal Clear Water Systems Corp.',
-            'HYDROTECH' => 'HydroTech Filtration Supply',
-            'PUREFLOW' => 'PureFlow Membrane Distributors',
-            'WATERWORKS' => 'Metro WaterWorks Trading',
+            'AQUAPRO' => ['name' => 'AquaPro Water Systems Inc.', 'email' => 'sales@aquapro.example.ph', 'phone' => '0917-555-0101', 'city' => 'Quezon City', 'tax' => '201-455-890-000'],
+            'CHEMFLOW' => ['name' => 'ChemFlow Industrial Solutions Corp.', 'email' => 'orders@chemflow.example.ph', 'phone' => '0918-555-0202', 'city' => 'Manila', 'tax' => '304-889-112-000'],
+            'HYDROTECH' => ['name' => 'HydroTech Filtration Supply', 'email' => 'contact@hydrotechsupply.example.ph', 'phone' => '0920-555-0303', 'city' => 'Pasig City', 'tax' => '409-123-776-000'],
+            'FLOWMAX' => ['name' => 'FlowMax Valves & Pumps Ltd.', 'email' => 'support@flowmax.example.ph', 'phone' => '0922-555-0404', 'city' => 'Valenzuela City', 'tax' => '501-998-334-000'],
+            'PRECISION' => ['name' => 'Precision Water Instruments Co.', 'email' => 'sales@precisioninstruments.example.ph', 'phone' => '0925-555-0505', 'city' => 'Cebu City', 'tax' => '602-334-889-000'],
         ];
 
         $suppliers = [];
-        foreach ($definitions as $code => $legalName) {
+        foreach ($definitions as $code => $info) {
             $suppliers[$code] = Supplier::query()->updateOrCreate(
                 ['code' => $code],
                 [
-                    'legal_name' => $legalName,
+                    'legal_name' => $info['name'],
+                    'tax_identifier' => $info['tax'],
+                    'email' => $info['email'],
+                    'phone' => $info['phone'],
+                    'city' => $info['city'],
                     'country_code' => 'PH',
                     'default_currency_code' => 'PHP',
                     'is_active' => true,
@@ -160,53 +159,69 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
+     * @param array<string, Category> $categories
+     * @param \Illuminate\Support\Collection<string, UnitOfMeasure> $units
      * @return array<string, Product>
      */
-    private function seedProducts(array $categories, UnitOfMeasure $unit): array
+    private function seedProducts(array $categories, $units): array
     {
         $definitions = [
-            ['sku' => 'SHX-FLT-001', 'category' => 'FILT', 'name' => '5-Micron Sediment Filter Cartridge', 'price' => '250.0000'],
-            ['sku' => 'SHX-FLT-002', 'category' => 'FILT', 'name' => 'Carbon Block Filter Cartridge', 'price' => '380.0000'],
-            ['sku' => 'SHX-FLT-003', 'category' => 'FILT', 'name' => 'GAC Granular Activated Carbon Filter', 'price' => '420.0000'],
-            ['sku' => 'SHX-FLT-004', 'category' => 'FILT', 'name' => '1-Micron Post Carbon Filter', 'price' => '310.0000'],
-            ['sku' => 'SHX-MEM-001', 'category' => 'MEMB', 'name' => '75 GPD RO Membrane', 'price' => '1450.0000'],
-            ['sku' => 'SHX-MEM-002', 'category' => 'MEMB', 'name' => '100 GPD RO Membrane', 'price' => '1850.0000'],
-            ['sku' => 'SHX-MEM-003', 'category' => 'MEMB', 'name' => '150 GPD Commercial RO Membrane', 'price' => '2600.0000'],
-            ['sku' => 'SHX-UVL-001', 'category' => 'UV', 'name' => '11W UV Sterilizer Lamp', 'price' => '1650.0000'],
-            ['sku' => 'SHX-UVL-002', 'category' => 'UV', 'name' => '40W UV Sterilizer System', 'price' => '4200.0000'],
-            ['sku' => 'SHX-UVL-003', 'category' => 'UV', 'name' => 'UV Quartz Sleeve Replacement', 'price' => '980.0000'],
-            ['sku' => 'SHX-TNK-001', 'category' => 'TANK', 'name' => '20L Pressure Storage Tank', 'price' => '3800.0000'],
-            ['sku' => 'SHX-TNK-002', 'category' => 'TANK', 'name' => '100L Polyethylene Water Tank', 'price' => '6500.0000'],
-            ['sku' => 'SHX-TNK-003', 'category' => 'TANK', 'name' => '500L Vertical Storage Tank', 'price' => '14500.0000'],
-            ['sku' => 'SHX-DSP-001', 'category' => 'DISP', 'name' => 'Hot and Cold Water Dispenser', 'price' => '4800.0000'],
-            ['sku' => 'SHX-DSP-002', 'category' => 'DISP', 'name' => 'Bottom-Load Water Dispenser', 'price' => '6200.0000'],
-            ['sku' => 'SHX-DSP-003', 'category' => 'DISP', 'name' => 'Countertop Water Dispenser', 'price' => '3600.0000'],
-            ['sku' => 'SHX-FIT-001', 'category' => 'FITT', 'name' => '1/4 inch Quick Connect Fitting', 'price' => '60.0000'],
-            ['sku' => 'SHX-FIT-002', 'category' => 'FITT', 'name' => 'Push-Fit Ball Valve', 'price' => '150.0000'],
-            ['sku' => 'SHX-FIT-003', 'category' => 'FITT', 'name' => 'Feed Water Adapter Valve', 'price' => '120.0000'],
-            ['sku' => 'SHX-FIT-004', 'category' => 'FITT', 'name' => 'Faucet Diverter Valve', 'price' => '220.0000'],
-            ['sku' => 'SHX-CHM-001', 'category' => 'CHEM', 'name' => 'Calcium Carbonate Filter Media (1kg)', 'price' => '420.0000'],
-            ['sku' => 'SHX-CHM-002', 'category' => 'CHEM', 'name' => 'Sodium Hypochlorite Disinfectant (5L)', 'price' => '650.0000'],
-            ['sku' => 'SHX-CHM-003', 'category' => 'CHEM', 'name' => 'Anti-Scale Filter Media', 'price' => '540.0000'],
-            ['sku' => 'SHX-ACC-001', 'category' => 'ACC', 'name' => 'Filter Housing Wrench', 'price' => '180.0000'],
-            ['sku' => 'SHX-ACC-002', 'category' => 'ACC', 'name' => 'O-Ring Seal Kit', 'price' => '90.0000'],
-            ['sku' => 'SHX-ACC-003', 'category' => 'ACC', 'name' => 'Filter Housing Bracket', 'price' => '160.0000'],
+            // Category 1: Water Filtration & Cartridges
+            ['sku' => 'SHX-FLT-001', 'category' => 'FILT', 'unit' => 'EA', 'name' => '10-inch 5-Micron Sediment Filter', 'price' => '220.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FLT-002', 'category' => 'FILT', 'unit' => 'EA', 'name' => '10-inch CTO Carbon Block Cartridge', 'price' => '350.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FLT-003', 'category' => 'FILT', 'unit' => 'EA', 'name' => '10-inch GAC Granular Activated Carbon', 'price' => '380.0000', 'lead' => '7.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FLT-004', 'category' => 'FILT', 'unit' => 'EA', 'name' => '75 GPD Residential RO Membrane Element', 'price' => '1450.0000', 'lead' => '7.00', 'lot' => true, 'exp' => false],
+            ['sku' => 'SHX-FLT-005', 'category' => 'FILT', 'unit' => 'EA', 'name' => 'Alkaline Mineral & Post-Carbon Filter', 'price' => '480.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+
+            // Category 2: Water Treatment Chemicals
+            ['sku' => 'SHX-CHM-001', 'category' => 'CHEM', 'unit' => 'KG', 'name' => 'Calcium Hypochlorite 70% Chlorine Granules', 'price' => '280.0000', 'lead' => '4.00', 'lot' => true, 'exp' => true],
+            ['sku' => 'SHX-CHM-002', 'category' => 'CHEM', 'unit' => 'L', 'name' => 'Liquid Algaecide & Clarifier Solution', 'price' => '450.0000', 'lead' => '4.00', 'lot' => true, 'exp' => true],
+            ['sku' => 'SHX-CHM-003', 'category' => 'CHEM', 'unit' => 'KG', 'name' => 'pH Booster Soda Ash Dense Grade', 'price' => '190.0000', 'lead' => '3.00', 'lot' => true, 'exp' => false],
+            ['sku' => 'SHX-CHM-004', 'category' => 'CHEM', 'unit' => 'KG', 'name' => 'PAC Polyaluminium Chloride Coagulant', 'price' => '320.0000', 'lead' => '5.00', 'lot' => true, 'exp' => true],
+            ['sku' => 'SHX-CHM-005', 'category' => 'CHEM', 'unit' => 'BAG', 'name' => 'High-Purity Water Softener Salt Pellets (25kg)', 'price' => '650.0000', 'lead' => '3.00', 'lot' => false, 'exp' => false],
+
+            // Category 3: Pumps & Pressure Tanks
+            ['sku' => 'SHX-PMP-001', 'category' => 'PUMP', 'unit' => 'EA', 'name' => '1.0 HP Multi-Stage Water Booster Pump', 'price' => '6800.0000', 'lead' => '10.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-PMP-002', 'category' => 'PUMP', 'unit' => 'EA', 'name' => '24V DC Reverse Osmosis Booster Pump 75GPD', 'price' => '1850.0000', 'lead' => '7.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-PMP-003', 'category' => 'PUMP', 'unit' => 'EA', 'name' => '24-Liter Heavy Duty Diaphragm Pressure Tank', 'price' => '3200.0000', 'lead' => '7.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-PMP-004', 'category' => 'PUMP', 'unit' => 'EA', 'name' => 'Electronic Automatic Pump Flow Control Switch', 'price' => '1250.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-PMP-005', 'category' => 'PUMP', 'unit' => 'EA', 'name' => '0.5 HP Stainless Submersible Deep Well Pump', 'price' => '5400.0000', 'lead' => '12.00', 'lot' => false, 'exp' => false],
+
+            // Category 4: Fittings, Valves & Pipes
+            ['sku' => 'SHX-FIT-001', 'category' => 'FITT', 'unit' => 'EA', 'name' => '1/4-inch Push-Fit Quick Connect Male Adapter', 'price' => '45.0000', 'lead' => '3.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FIT-002', 'category' => 'FITT', 'unit' => 'EA', 'name' => '1/2-inch Electric Brass Solenoid Valve 220V', 'price' => '850.0000', 'lead' => '7.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FIT-003', 'category' => 'FITT', 'unit' => 'EA', 'name' => 'Heavy Duty PVC True Union Ball Valve 1-inch', 'price' => '280.0000', 'lead' => '4.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FIT-004', 'category' => 'FITT', 'unit' => 'EA', 'name' => 'Stainless Steel Non-Return Spring Check Valve', 'price' => '420.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-FIT-005', 'category' => 'FITT', 'unit' => 'EA', 'name' => 'Glycerin-Filled Pressure Gauge 0-100 PSI', 'price' => '490.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+
+            // Category 5: Water Testing & Instruments
+            ['sku' => 'SHX-TST-001', 'category' => 'TEST', 'unit' => 'EA', 'name' => 'Digital TDS & Temperature Handheld Meter', 'price' => '550.0000', 'lead' => '5.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-TST-002', 'category' => 'TEST', 'unit' => 'BOX', 'name' => 'Rapid pH & Chlorine Reagent Dropper Test Kit', 'price' => '680.0000', 'lead' => '5.00', 'lot' => true, 'exp' => true],
+            ['sku' => 'SHX-TST-003', 'category' => 'TEST', 'unit' => 'BOX', 'name' => 'Total Water Hardness Titration Test Kit', 'price' => '1200.0000', 'lead' => '7.00', 'lot' => true, 'exp' => true],
+            ['sku' => 'SHX-TST-004', 'category' => 'TEST', 'unit' => 'EA', 'name' => 'Digital Pulse Water Turbine Flow Meter 1/2-inch', 'price' => '1950.0000', 'lead' => '10.00', 'lot' => false, 'exp' => false],
+            ['sku' => 'SHX-TST-005', 'category' => 'TEST', 'unit' => 'EA', 'name' => 'Pocket Salinity / Conductivity Tester Pen', 'price' => '1450.0000', 'lead' => '7.00', 'lot' => false, 'exp' => false],
         ];
 
         $products = [];
-        foreach ($definitions as $definition) {
-            $products[$definition['sku']] = Product::factory()->create([
-                'category_id' => $categories[$definition['category']]->id,
-                'stock_unit_id' => $unit->id,
-                'sku' => $definition['sku'],
-                'barcode' => null,
-                'name' => $definition['name'],
-                'description' => $definition['name'].' for residential and commercial water treatment systems.',
-                'image_url' => "https://picsum.photos/seed/{$definition['sku']}/600/600",
+        foreach ($definitions as $def) {
+            $unitModel = $units->get($def['unit']) ?? $units->first();
+
+            $products[$def['sku']] = Product::query()->create([
+                'category_id' => $categories[$def['category']]->id,
+                'stock_unit_id' => $unitModel->id,
+                'sku' => $def['sku'],
+                'name' => $def['name'],
+                'description' => "Commercial and residential water treatment grade {$def['name']}.",
+                'image_url' => "https://picsum.photos/seed/{$def['sku']}/600/600",
                 'product_type' => 'stock',
                 'default_tax_rate' => '12.0000',
-                'selling_price' => $definition['price'],
-                'default_lead_time_days' => '7.00',
+                'selling_price' => $def['price'],
+                'default_lead_time_days' => $def['lead'],
+                'is_active' => true,
+                'is_lot_tracked' => $def['lot'],
+                'is_serial_tracked' => false,
+                'is_expiry_tracked' => $def['exp'],
+                'row_version' => 1,
             ]);
         }
 
@@ -214,92 +229,98 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * @param  array<string, Supplier>  $suppliers
-     * @param  array<string, Product>  $products
+     * @param array<string, Supplier> $suppliers
+     * @param array<string, Product> $products
+     * @param \Illuminate\Support\Collection<string, UnitOfMeasure> $units
      */
-    private function seedPurchaseOrdersAndReceipts(Branch $branch, array $suppliers, array $products, User $manager, User $owner, UnitOfMeasure $unit): void
+    private function seedPurchaseOrdersAndReceipts(Branch $branch, array $suppliers, array $products, User $manager, User $owner, $units): void
     {
         $poService = app(PurchaseOrderService::class);
         $grService = app(GoodsReceiptService::class);
 
-        // PO 1: draft only.
-        $this->createDraftPo($poService, $branch, $suppliers['AQUAPH'], $manager, $unit, $products, [
-            ['sku' => 'SHX-FLT-001', 'qty' => '200', 'cost' => '150.0000'],
-            ['sku' => 'SHX-FLT-002', 'qty' => '150', 'cost' => '230.0000'],
+        // PO 1: Main bulk receiving (creates healthy base stocks + overstocked salt & fittings)
+        $po1 = $this->createDraftPo($poService, $branch, $suppliers['AQUAPRO'], $manager, $products, [
+            ['sku' => 'SHX-FLT-001', 'qty' => '120', 'cost' => '130.0000'],
+            ['sku' => 'SHX-FLT-002', 'qty' => '90', 'cost' => '210.0000'],
+            ['sku' => 'SHX-FLT-004', 'qty' => '40', 'cost' => '950.0000'],
+            ['sku' => 'SHX-FLT-005', 'qty' => '60', 'cost' => '280.0000'],
         ]);
+        $poService->submit($po1, $manager, (string) Str::uuid());
+        $poService->decide($po1, 'approved', null, $owner, (string) Str::uuid());
+        $poService->markOrdered($po1, now()->subDays(55), 'PO-AQ-01', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po1, $branch, $manager, now()->subDays(50));
 
-        // PO 2: submitted only.
-        $po2 = $this->createDraftPo($poService, $branch, $suppliers['CRYSTALWTR'], $manager, $unit, $products, [
-            ['sku' => 'SHX-MEM-001', 'qty' => '30', 'cost' => '900.0000'],
+        // PO 2: Chemicals receiving (includes overstocked salt & moderate chemicals)
+        $po2 = $this->createDraftPo($poService, $branch, $suppliers['CHEMFLOW'], $manager, $products, [
+            ['sku' => 'SHX-CHM-002', 'qty' => '30', 'cost' => '280.0000'],
+            ['sku' => 'SHX-CHM-003', 'qty' => '50', 'cost' => '110.0000'],
+            ['sku' => 'SHX-CHM-004', 'qty' => '40', 'cost' => '190.0000'],
+            ['sku' => 'SHX-CHM-005', 'qty' => '250', 'cost' => '420.0000'], // OVERSTOCK
         ]);
         $poService->submit($po2, $manager, (string) Str::uuid());
+        $poService->decide($po2, 'approved', null, $owner, (string) Str::uuid());
+        $poService->markOrdered($po2, now()->subDays(45), 'PO-CF-01', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po2, $branch, $manager, now()->subDays(40));
 
-        // PO 3: approved only.
-        $po3 = $this->createDraftPo($poService, $branch, $suppliers['HYDROTECH'], $manager, $unit, $products, [
-            ['sku' => 'SHX-UVL-001', 'qty' => '20', 'cost' => '1000.0000'],
+        // PO 3: Pumps & Pressure Tanks receiving
+        $po3 = $this->createDraftPo($poService, $branch, $suppliers['FLOWMAX'], $manager, $products, [
+            ['sku' => 'SHX-PMP-001', 'qty' => '12', 'cost' => '4500.0000'],
+            ['sku' => 'SHX-PMP-003', 'qty' => '15', 'cost' => '2100.0000'],
+            ['sku' => 'SHX-PMP-004', 'qty' => '25', 'cost' => '750.0000'],
         ]);
         $poService->submit($po3, $manager, (string) Str::uuid());
         $poService->decide($po3, 'approved', null, $owner, (string) Str::uuid());
+        $poService->markOrdered($po3, now()->subDays(35), 'PO-FM-01', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po3, $branch, $manager, now()->subDays(30));
 
-        // PO 4: ordered only, no receiving yet.
-        $po4 = $this->createDraftPo($poService, $branch, $suppliers['PUREFLOW'], $manager, $unit, $products, [
-            ['sku' => 'SHX-TNK-001', 'qty' => '15', 'cost' => '2600.0000'],
+        // PO 4: Fittings & Valves (Includes overstocked Ball Valves)
+        $po4 = $this->createDraftPo($poService, $branch, $suppliers['FLOWMAX'], $manager, $products, [
+            ['sku' => 'SHX-FIT-001', 'qty' => '100', 'cost' => '25.0000'],
+            ['sku' => 'SHX-FIT-002', 'qty' => '30', 'cost' => '520.0000'],
+            ['sku' => 'SHX-FIT-003', 'qty' => '180', 'cost' => '160.0000'], // OVERSTOCK
+            ['sku' => 'SHX-FIT-004', 'qty' => '40', 'cost' => '250.0000'],
+            ['sku' => 'SHX-FIT-005', 'qty' => '45', 'cost' => '290.0000'],
         ]);
         $poService->submit($po4, $manager, (string) Str::uuid());
         $poService->decide($po4, 'approved', null, $owner, (string) Str::uuid());
-        $poService->markOrdered($po4, now(), 'SO-2201', $manager, (string) Str::uuid());
+        $poService->markOrdered($po4, now()->subDays(25), 'PO-FM-02', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po4, $branch, $manager, now()->subDays(20));
 
-        // PO 5: ordered, then closed without ever being received.
-        $po5 = $this->createDraftPo($poService, $branch, $suppliers['WATERWORKS'], $manager, $unit, $products, [
-            ['sku' => 'SHX-FIT-001', 'qty' => '100', 'cost' => '35.0000'],
+        // PO 5: Testing Instruments
+        $po5 = $this->createDraftPo($poService, $branch, $suppliers['PRECISION'], $manager, $products, [
+            ['sku' => 'SHX-TST-001', 'qty' => '35', 'cost' => '320.0000'],
+            ['sku' => 'SHX-TST-002', 'qty' => '40', 'cost' => '390.0000'],
+            ['sku' => 'SHX-TST-004', 'qty' => '15', 'cost' => '1150.0000'],
+            ['sku' => 'SHX-TST-005', 'qty' => '20', 'cost' => '850.0000'],
         ]);
         $poService->submit($po5, $manager, (string) Str::uuid());
         $poService->decide($po5, 'approved', null, $owner, (string) Str::uuid());
-        $poService->markOrdered($po5, now(), 'SO-2202', $manager, (string) Str::uuid());
-        $poService->close($po5, 'Supplier discontinued the line before delivery.', $manager, (string) Str::uuid());
+        $poService->markOrdered($po5, now()->subDays(20), 'PO-PI-01', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po5, $branch, $manager, now()->subDays(15));
 
-        // PO 6: ordered, fully received — the main stock source for the sales demo below.
-        $po6 = $this->createDraftPo($poService, $branch, $suppliers['AQUAPH'], $manager, $unit, $products, [
-            ['sku' => 'SHX-FLT-001', 'qty' => '250', 'cost' => '150.0000'],
-            ['sku' => 'SHX-FLT-002', 'qty' => '180', 'cost' => '230.0000'],
-            ['sku' => 'SHX-FLT-004', 'qty' => '200', 'cost' => '190.0000'],
+        // PO 6: Thin receiving to create deliberate LOW STOCK items
+        $po6 = $this->createDraftPo($poService, $branch, $suppliers['HYDROTECH'], $manager, $products, [
+            ['sku' => 'SHX-FLT-003', 'qty' => '12', 'cost' => '230.0000'], // Low Stock (ROP 20)
+            ['sku' => 'SHX-CHM-001', 'qty' => '10', 'cost' => '170.0000'], // Low Stock (ROP 18)
         ]);
         $poService->submit($po6, $manager, (string) Str::uuid());
         $poService->decide($po6, 'approved', null, $owner, (string) Str::uuid());
-        $poService->markOrdered($po6, now()->subDays(50), 'SO-2100', $manager, (string) Str::uuid());
-        $this->receiveFullPo($grService, $po6, $branch, $manager, now()->subDays(46));
+        $poService->markOrdered($po6, now()->subDays(10), 'PO-HT-01', $manager, (string) Str::uuid());
+        $this->receiveFullPo($grService, $po6, $branch, $manager, now()->subDays(7));
 
-        // PO 7: ordered, partially received — leaves a deliberately thin
-        // dispenser balance so it shows a real restocking alert.
-        $po7 = $this->createDraftPo($poService, $branch, $suppliers['CRYSTALWTR'], $manager, $unit, $products, [
-            ['sku' => 'SHX-DSP-001', 'qty' => '30', 'cost' => '3200.0000'],
-            ['sku' => 'SHX-DSP-002', 'qty' => '20', 'cost' => '4100.0000'],
-        ]);
-        $poService->submit($po7, $manager, (string) Str::uuid());
-        $poService->decide($po7, 'approved', null, $owner, (string) Str::uuid());
-        $poService->markOrdered($po7, now()->subDays(40), 'SO-2150', $manager, (string) Str::uuid());
-        $this->receivePartialPo($grService, $po7, $branch, $manager, now()->subDays(35));
-
-        // PO 8: ordered, fully received but a deliberately thin quantity —
-        // another guaranteed restocking-alert candidate, never sold from.
-        $po8 = $this->createDraftPo($poService, $branch, $suppliers['AQUAPH'], $manager, $unit, $products, [
-            ['sku' => 'SHX-FLT-003', 'qty' => '15', 'cost' => '260.0000'],
-        ]);
-        $poService->submit($po8, $manager, (string) Str::uuid());
-        $poService->decide($po8, 'approved', null, $owner, (string) Str::uuid());
-        $poService->markOrdered($po8, now()->subDays(20), 'SO-2170', $manager, (string) Str::uuid());
-        $this->receiveFullPo($grService, $po8, $branch, $manager, now()->subDays(18));
+        // Note: Products 'SHX-PMP-002' (RO Diaphragm Pump), 'SHX-PMP-005' (Submersible Pump), and 'SHX-TST-003' (Hardness Test Kit)
+        // are NEVER received, so their on-hand balance remains 0.0000 -> Deliberate OUT OF STOCK demonstration!
     }
 
     /**
-     * @param  array<string, Product>  $products
-     * @param  array<int, array{sku: string, qty: string, cost: string}>  $lineDefs
+     * @param array<string, Product> $products
+     * @param array<int, array{sku: string, qty: string, cost: string}> $lineDefs
      */
-    private function createDraftPo(PurchaseOrderService $poService, Branch $branch, Supplier $supplier, User $actor, UnitOfMeasure $unit, array $products, array $lineDefs): PurchaseOrder
+    private function createDraftPo(PurchaseOrderService $poService, Branch $branch, Supplier $supplier, User $actor, array $products, array $lineDefs): PurchaseOrder
     {
         $lines = array_map(fn ($lineDef) => [
             'product_id' => $products[$lineDef['sku']]->id,
-            'unit_id' => $unit->id,
+            'unit_id' => $products[$lineDef['sku']]->stock_unit_id,
             'ordered_quantity' => $lineDef['qty'],
             'unit_cost' => $lineDef['cost'],
             'tax_rate' => '12',
@@ -315,13 +336,15 @@ class DemoDataSeeder extends Seeder
 
     private function receiveFullPo(GoodsReceiptService $grService, PurchaseOrder $po, Branch $branch, User $actor, \DateTimeInterface $receivedAt): void
     {
-        $po->refresh()->load('lines');
+        $po->refresh()->load('lines.product');
 
         $lines = $po->lines->map(fn ($line) => [
             'purchase_order_line_id' => $line->id,
             'received_quantity' => $line->ordered_quantity,
             'accepted_quantity' => $line->ordered_quantity,
             'rejected_quantity' => '0.0000',
+            'lot_number' => $line->product->is_lot_tracked ? 'LOT-'.now()->format('Ymd').'-'.$line->id : null,
+            'expiry_date' => $line->product->is_expiry_tracked ? now()->addMonths(24)->toDateString() : null,
         ])->all();
 
         $receipt = $grService->createDraft([
@@ -334,118 +357,81 @@ class DemoDataSeeder extends Seeder
         $grService->post($receipt, $actor, (string) Str::uuid());
     }
 
-    private function receivePartialPo(GoodsReceiptService $grService, PurchaseOrder $po, Branch $branch, User $actor, \DateTimeInterface $receivedAt): void
-    {
-        $po->refresh()->load('lines');
-
-        $lines = $po->lines->map(function ($line) {
-            $accepted = bcmul($line->ordered_quantity, '0.4', 4);
-
-            return [
-                'purchase_order_line_id' => $line->id,
-                'received_quantity' => $accepted,
-                'accepted_quantity' => $accepted,
-                'rejected_quantity' => '0.0000',
-            ];
-        })->all();
-
-        $receipt = $grService->createDraft([
-            'purchase_order_id' => $po->id,
-            'branch_id' => $branch->id,
-            'received_at' => $receivedAt,
-            'lines' => $lines,
-        ], $actor, (string) Str::uuid());
-
-        $grService->post($receipt, $actor, (string) Str::uuid());
-    }
-
     /**
-     * @param  array<string, Product>  $products
+     * @param array<string, Product> $products
      */
     private function seedInventoryAdjustments(Branch $branch, array $products, User $manager, User $owner): void
     {
         $adjService = app(InventoryAdjustmentService::class);
 
-        // Posted: physical count found extra stock not yet logged.
+        // Adjustment 1: Physical count found +5 sediment filters
         $adj1 = $adjService->createDraft([
             'branch_id' => $branch->id,
             'reason_code' => 'stock_count_correction',
-            'reason_note' => 'Quarterly physical count found additional units not yet logged.',
-            'effective_at' => now()->subDays(10),
+            'reason_note' => 'Quarterly physical audit found extra unlogged filter units.',
+            'effective_at' => now()->subDays(12),
             'lines' => [[
                 'product_id' => $products['SHX-FLT-001']->id,
-                'quantity_delta' => '8.0000',
-                'unit_cost' => '150.0000',
+                'quantity_delta' => '5.0000',
+                'unit_cost' => '130.0000',
             ]],
         ], $manager, (string) Str::uuid());
         $adjService->approve($adj1, $owner, (string) Str::uuid());
         $adjService->post($adj1, $manager, (string) Str::uuid());
-
-        // Posted, then reversed: a damage write-off later found to be a
-        // miscount rather than actual damage.
-        $adj2 = $adjService->createDraft([
-            'branch_id' => $branch->id,
-            'reason_code' => 'damage',
-            'reason_note' => 'Water damage during storage relocation.',
-            'effective_at' => now()->subDays(8),
-            'lines' => [[
-                'product_id' => $products['SHX-FLT-002']->id,
-                'quantity_delta' => '-6.0000',
-                'unit_cost' => '230.0000',
-            ]],
-        ], $manager, (string) Str::uuid());
-        $adjService->approve($adj2, $owner, (string) Str::uuid());
-        $adjService->post($adj2, $manager, (string) Str::uuid());
-        $adjService->reverse($adj2, 'Recount confirmed the units were misplaced, not damaged.', $owner, (string) Str::uuid());
     }
 
     /**
-     * @param  array<string, Product>  $products
+     * @param array<string, Product> $products
+     * @param \Illuminate\Support\Collection<string, UnitOfMeasure> $units
      */
-    private function seedSales(Branch $branch, array $products, User $staffOne, User $staffTwo, UnitOfMeasure $unit): void
+    private function seedSales(Branch $branch, array $products, User $staffOne, User $staffTwo, $units): void
     {
         $saleService = app(SaleService::class);
         $cashiers = [$staffOne, $staffTwo];
 
-        $pool = ['SHX-FLT-001', 'SHX-FLT-002', 'SHX-FLT-004'];
-        // Starting balances match PO 6 plus the net effect of the two demo
-        // adjustments above (adj2's -6 is undone by its own reversal).
-        $remaining = ['SHX-FLT-001' => '258.0000', 'SHX-FLT-002' => '180.0000', 'SHX-FLT-004' => '200.0000'];
-        $floor = ['SHX-FLT-001' => '50.0000', 'SHX-FLT-002' => '40.0000', 'SHX-FLT-004' => '50.0000'];
+        // Active selling pool of products
+        $salesPool = [
+            'SHX-FLT-001' => ['dailyMin' => 1, 'dailyMax' => 4, 'unitPrice' => '220.0000'],
+            'SHX-FLT-002' => ['dailyMin' => 1, 'dailyMax' => 3, 'unitPrice' => '350.0000'],
+            'SHX-FLT-003' => ['dailyMin' => 1, 'dailyMax' => 2, 'unitPrice' => '380.0000'],
+            'SHX-FLT-004' => ['dailyMin' => 0, 'dailyMax' => 2, 'unitPrice' => '1450.0000'],
+            'SHX-FLT-005' => ['dailyMin' => 1, 'dailyMax' => 3, 'unitPrice' => '480.0000'],
+            'SHX-CHM-001' => ['dailyMin' => 0, 'dailyMax' => 2, 'unitPrice' => '280.0000'],
+            'SHX-CHM-002' => ['dailyMin' => 0, 'dailyMax' => 2, 'unitPrice' => '450.0000'],
+            'SHX-FIT-001' => ['dailyMin' => 2, 'dailyMax' => 5, 'unitPrice' => '45.0000'],
+            'SHX-TST-001' => ['dailyMin' => 1, 'dailyMax' => 2, 'unitPrice' => '550.0000'],
+            'SHX-TST-002' => ['dailyMin' => 1, 'dailyMax' => 2, 'unitPrice' => '680.0000'],
+        ];
 
         $saleIndex = 0;
+
+        // Generate sales across past 40 days to give SMA a rich dataset
         for ($daysAgo = 40; $daysAgo >= 1; $daysAgo--) {
-            $salesToday = random_int(0, 2);
-            for ($i = 0; $i < $salesToday; $i++) {
-                $sku = $pool[array_rand($pool)];
-                $headroom = bcsub($remaining[$sku], $floor[$sku], 4);
-                if (bccomp($headroom, '1', 4) < 0) {
+            $transactionsToday = random_int(1, 3);
+            for ($t = 0; $t < $transactionsToday; $t++) {
+                $sku = array_rand($salesPool);
+                $config = $salesPool[$sku];
+                $product = $products[$sku];
+
+                $qty = random_int($config['dailyMin'], $config['dailyMax']);
+                if ($qty <= 0) {
                     continue;
                 }
 
-                $quantity = (string) min(3, random_int(1, 3), (int) $headroom);
-                $soldAt = now()->subDays($daysAgo)->setTime(random_int(9, 17), random_int(0, 59));
-
-                $this->recordSale($saleService, $branch, $products[$sku], $unit, $quantity, $cashiers[$saleIndex % 2], $soldAt, ++$saleIndex);
-                $remaining[$sku] = bcsub($remaining[$sku], $quantity, 4);
+                $soldAt = now()->subDays($daysAgo)->setTime(random_int(8, 18), random_int(0, 59));
+                $this->recordSale($saleService, $branch, $product, (string) $qty, $cashiers[$saleIndex % 2], $soldAt, ++$saleIndex);
             }
         }
 
-        // A couple of sales dated today, so the dashboard's "Sales today" KPI has data.
-        foreach (['SHX-FLT-001', 'SHX-FLT-004'] as $sku) {
-            $headroom = bcsub($remaining[$sku], $floor[$sku], 4);
-            if (bccomp($headroom, '1', 4) < 0) {
-                continue;
-            }
-
-            $quantity = '2.0000';
-            $soldAt = now()->subHours(random_int(1, 6));
-            $this->recordSale($saleService, $branch, $products[$sku], $unit, $quantity, $cashiers[$saleIndex % 2], $soldAt, ++$saleIndex);
-            $remaining[$sku] = bcsub($remaining[$sku], $quantity, 4);
+        // Today's completed sales for live dashboard KPIs
+        foreach (['SHX-FLT-001', 'SHX-FLT-002', 'SHX-TST-001'] as $sku) {
+            $product = $products[$sku];
+            $soldAt = now()->subHours(random_int(1, 5));
+            $this->recordSale($saleService, $branch, $product, '2.0000', $cashiers[$saleIndex % 2], $soldAt, ++$saleIndex);
         }
     }
 
-    private function recordSale(SaleService $saleService, Branch $branch, Product $product, UnitOfMeasure $unit, string $quantity, User $cashier, \DateTimeInterface $soldAt, int $saleIndex): void
+    private function recordSale(SaleService $saleService, Branch $branch, Product $product, string $quantity, User $cashier, \DateTimeInterface $soldAt, int $saleIndex): void
     {
         $unitPrice = (string) $product->selling_price;
         $gross = bcmul($quantity, $unitPrice, 4);
@@ -459,7 +445,7 @@ class DemoDataSeeder extends Seeder
             'idempotency_key' => 'SEED-SALE-'.$saleIndex,
             'lines' => [[
                 'product_id' => $product->id,
-                'unit_id' => $unit->id,
+                'unit_id' => $product->stock_unit_id,
                 'quantity' => $quantity,
             ]],
             'payments' => [[
@@ -470,31 +456,42 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * @param  array<string, Product>  $products
+     * @param array<string, Product> $products
      */
-    private function seedReorderPolicies(Branch $branch, array $products, User $manager): void
+    private function seedReorderPoliciesAndEoq(Branch $branch, array $products, User $manager): void
     {
-        // Only the products that were actually received get a reorder
-        // policy, so the demo shows a focused, deliberate mix of healthy
-        // and low-stock items rather than flagging the entire catalog.
-        $definitions = [
-            'SHX-FLT-001' => '25.0000',
-            'SHX-FLT-002' => '25.0000',
-            'SHX-FLT-003' => '30.0000',
-            'SHX-FLT-004' => '25.0000',
-            'SHX-DSP-001' => '15.0000',
-            'SHX-DSP-002' => '10.0000',
+        $eoqService = app(EoqService::class);
+
+        // Reorder Policies configured for each category to demonstrate Low Stock, Out of Stock, and Optimal
+        $policies = [
+            // Low stock triggers (ROP > current stock)
+            'SHX-FLT-003' => ['safety' => '10.0000', 'basis' => 'policy_minimum', 'rop' => '20.0000', 'annualD' => '600', 'orderCost' => '450', 'holdCost' => '35'],
+            'SHX-CHM-001' => ['safety' => '8.0000', 'basis' => 'service_level', 'rop' => '18.0000', 'annualD' => '450', 'orderCost' => '500', 'holdCost' => '25'],
+
+            // Out of stock triggers (0 on hand, ROP active)
+            'SHX-PMP-002' => ['safety' => '5.0000', 'basis' => 'policy_minimum', 'rop' => '12.0000', 'annualD' => '150', 'orderCost' => '800', 'holdCost' => '90'],
+            'SHX-TST-003' => ['safety' => '6.0000', 'basis' => 'policy_minimum', 'rop' => '15.0000', 'annualD' => '200', 'orderCost' => '600', 'holdCost' => '80'],
+
+            // Healthy / Optimal stock
+            'SHX-FLT-001' => ['safety' => '15.0000', 'basis' => 'policy_minimum', 'rop' => '30.0000', 'annualD' => '1200', 'orderCost' => '500', 'holdCost' => '20'],
+            'SHX-FLT-002' => ['safety' => '12.0000', 'basis' => 'policy_minimum', 'rop' => '25.0000', 'annualD' => '850', 'orderCost' => '450', 'holdCost' => '30'],
+            'SHX-FIT-001' => ['safety' => '20.0000', 'basis' => 'policy_minimum', 'rop' => '35.0000', 'annualD' => '2400', 'orderCost' => '300', 'holdCost' => '5'],
+            'SHX-TST-001' => ['safety' => '8.0000', 'basis' => 'manual_override', 'rop' => '16.0000', 'annualD' => '350', 'orderCost' => '400', 'holdCost' => '45'],
+
+            // Overstocked products
+            'SHX-CHM-005' => ['safety' => '15.0000', 'basis' => 'policy_minimum', 'rop' => '25.0000', 'annualD' => '1000', 'orderCost' => '600', 'holdCost' => '40'],
+            'SHX-FIT-003' => ['safety' => '10.0000', 'basis' => 'policy_minimum', 'rop' => '20.0000', 'annualD' => '500', 'orderCost' => '350', 'holdCost' => '20'],
         ];
 
-        foreach ($definitions as $sku => $rop) {
+        foreach ($policies as $sku => $config) {
             $product = $products[$sku];
 
-            ReorderPolicy::query()->updateOrCreate(
+            $policy = ReorderPolicy::query()->updateOrCreate(
                 ['branch_id' => $branch->id, 'product_id' => $product->id],
                 [
-                    'safety_stock_quantity' => '10.0000',
-                    'safety_stock_basis' => 'policy_minimum',
-                    'reorder_point_quantity' => $rop,
+                    'safety_stock_quantity' => $config['safety'],
+                    'safety_stock_basis' => $config['basis'],
+                    'reorder_point_quantity' => $config['rop'],
                     'rop_calculated_at' => now(),
                     'is_active' => true,
                     'row_version' => 1,
@@ -502,6 +499,14 @@ class DemoDataSeeder extends Seeder
                     'updated_by_user_id' => $manager->id,
                 ],
             );
+
+            // Pre-seed calculated EOQ snapshot for instant recommendations demonstration
+            $eoqService->calculate($policy, [
+                'annual_demand_quantity' => $config['annualD'],
+                'ordering_cost' => $config['orderCost'],
+                'annual_holding_cost_per_unit' => $config['holdCost'],
+                'currency_code' => 'PHP',
+            ], $manager);
         }
     }
 
@@ -511,8 +516,8 @@ class DemoDataSeeder extends Seeder
             'branch_id' => $branch->id,
             'period_grain' => 'daily',
             'window_periods' => 14,
-            'history_start_date' => now()->subDays(15)->toDateString(),
-            'history_end_date' => now()->subDays(2)->toDateString(),
+            'history_start_date' => now()->subDays(14)->toDateString(),
+            'history_end_date' => now()->subDays(1)->toDateString(),
         ], $owner);
     }
 }

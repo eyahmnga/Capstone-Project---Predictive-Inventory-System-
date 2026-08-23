@@ -4,6 +4,7 @@ import { useEoqHistory } from '@/features/restocking/hooks/useRestocking'
 import type { ReorderPolicy } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type ReorderPolicyDetailsDrawerProps = {
@@ -41,9 +42,9 @@ export function ReorderPolicyDetailsDrawer({ policy, canCalculate, canCalculateE
         </header>
         <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           <section className="grid grid-cols-1 gap-4 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">
-            <div><p className="text-muted">Safety stock</p><p className="font-semibold text-ink">{policy.safetyStockQuantity} ({policy.safetyStockBasis.replace('_', ' ')})</p></div>
+            <div><p className="text-muted">Safety stock</p><p className="font-semibold text-ink">{formatQuantity(policy.safetyStockQuantity)} ({policy.safetyStockBasis.replace('_', ' ')})</p></div>
             <div><p className="text-muted">Lead time</p><p className="font-semibold text-ink">{policy.leadTimeDaysOverride ?? '—'} days ({policy.leadTimeBasis.replace('_', ' ')})</p></div>
-            <div><p className="text-muted">Reorder point</p><p className="font-semibold text-ink">{policy.reorderPointQuantity ?? 'Not calculated'}</p></div>
+            <div><p className="text-muted">Reorder point</p><p className="font-semibold text-ink">{policy.reorderPointQuantity ? formatQuantity(policy.reorderPointQuantity) : 'Not calculated'}</p></div>
             <div><p className="text-muted">Calculated at</p><p className="font-semibold text-ink">{policy.ropCalculatedAt ? new Date(policy.ropCalculatedAt).toLocaleString() : '—'}</p></div>
           </section>
 
@@ -72,7 +73,7 @@ export function ReorderPolicyDetailsDrawer({ policy, canCalculate, canCalculateE
                   {eoqHistoryQuery.data.map((calc) => (
                     <li key={calc.id} className="flex justify-between rounded-xl border border-border px-3 py-2">
                       <span className="text-muted">{calc.calculatedAt ? new Date(calc.calculatedAt).toLocaleString() : '—'}</span>
-                      <span className="font-semibold text-ink">{calc.recommendedOrderQuantity ?? '—'} units</span>
+                      <span className="font-semibold text-ink">{calc.recommendedOrderQuantity ? `${formatQuantity(calc.recommendedOrderQuantity)} units` : '—'}</span>
                     </li>
                   ))}
                 </ul>

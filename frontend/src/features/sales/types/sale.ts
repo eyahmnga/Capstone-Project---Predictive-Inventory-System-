@@ -39,6 +39,8 @@ export type SalePayment = {
 export type Sale = {
   id: string
   branchId: string
+  branchName?: string | null
+  branchCode?: string | null
   saleNumber: string
   status: SaleStatus
   currencyCode: string

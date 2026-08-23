@@ -7,6 +7,7 @@ import { SeverityBadge } from '@/features/restocking/components/SeverityBadge'
 import type { RestockingAlert } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type AlertDetailsDrawerProps = {
@@ -39,10 +40,10 @@ export function AlertDetailsDrawer({ alert, isActing, onClose, onAcknowledge, on
         </header>
         <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
           <section className="grid grid-cols-1 gap-4 rounded-xl border border-border p-4 text-sm sm:grid-cols-2">
-            <div><p className="text-muted">Available stock</p><p className="font-semibold text-ink">{alert.availableQuantitySnapshot}</p></div>
-            <div><p className="text-muted">Reorder point</p><p className="font-semibold text-ink">{alert.reorderPointSnapshot}</p></div>
-            <div><p className="text-muted">Incoming stock</p><p className="font-semibold text-ink">{alert.incomingQuantitySnapshot}</p></div>
-            <div><p className="text-muted">Recommended order</p><p className="font-semibold text-ink">{alert.recommendedOrderQuantity ?? '—'}</p></div>
+            <div><p className="text-muted">Available stock</p><p className="font-semibold text-ink">{formatQuantity(alert.availableQuantitySnapshot)}</p></div>
+            <div><p className="text-muted">Reorder point</p><p className="font-semibold text-ink">{formatQuantity(alert.reorderPointSnapshot)}</p></div>
+            <div><p className="text-muted">Incoming stock</p><p className="font-semibold text-ink">{formatQuantity(alert.incomingQuantitySnapshot)}</p></div>
+            <div><p className="text-muted">Recommended order</p><p className="font-semibold text-ink">{formatQuantity(alert.recommendedOrderQuantity)}</p></div>
             <div><p className="text-muted">First triggered</p><p className="font-semibold text-ink">{alert.firstTriggeredAt ? new Date(alert.firstTriggeredAt).toLocaleString() : '—'}</p></div>
             <div><p className="text-muted">Last evaluated</p><p className="font-semibold text-ink">{alert.lastEvaluatedAt ? new Date(alert.lastEvaluatedAt).toLocaleString() : '—'}</p></div>
           </section>

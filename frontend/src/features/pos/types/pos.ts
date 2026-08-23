@@ -5,6 +5,8 @@ export type PosProduct = {
   sku: string
   barcode: string | null
   name: string
+  imageUrl?: string | null
+  category: { id: string; name: string } | null
   stockUnit: { id: string; code: string; symbol: string } | null
   productType: 'stock' | 'non_stock' | 'service'
   defaultTaxRate: string
@@ -38,6 +40,7 @@ export type FinalizeSalePayload = {
   branchId: string
   soldAt: string
   currencyCode: string
+  taxExempt?: boolean
   notes?: string
   approvedByUserId?: string
   lines: Array<{

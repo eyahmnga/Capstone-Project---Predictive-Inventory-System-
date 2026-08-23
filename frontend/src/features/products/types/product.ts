@@ -60,6 +60,7 @@ export type ProductFormValues = {
   barcode: string
   name: string
   description: string
+  imageUrl: string | null
   productType: ProductType
   defaultTaxRate: string
   sellingPrice: string

@@ -1,6 +1,7 @@
 import type { InventoryBalance } from '@/features/inventory/types/inventory'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 export function InventoryBalanceTable({ balances }: { balances: InventoryBalance[] }) {
   return (
@@ -15,10 +16,10 @@ export function InventoryBalanceTable({ balances }: { balances: InventoryBalance
               title={balance.product?.name ?? '—'}
               subtitle={<span className="font-mono">{balance.product?.sku ?? '—'}</span>}
               fields={[
-                { label: 'On hand', value: balance.onHandQuantity },
-                { label: 'Reserved', value: balance.reservedQuantity },
-                { label: 'Available', value: <span className={Number(balance.availableQuantity) <= 0 ? 'font-semibold text-danger-text' : 'font-semibold text-ink'}>{balance.availableQuantity}</span> },
-                { label: 'Incoming', value: balance.incomingQuantity },
+                { label: 'On hand', value: formatQuantity(balance.onHandQuantity) },
+                { label: 'Reserved', value: formatQuantity(balance.reservedQuantity) },
+                { label: 'Available', value: <span className={Number(balance.availableQuantity) <= 0 ? 'font-semibold text-danger-text' : 'font-semibold text-ink'}>{formatQuantity(balance.availableQuantity)}</span> },
+                { label: 'Incoming', value: formatQuantity(balance.incomingQuantity) },
                 { label: 'Last movement', value: balance.lastMovementAt ? new Date(balance.lastMovementAt).toLocaleString() : '—', full: true },
               ]}
             />
@@ -47,10 +48,10 @@ export function InventoryBalanceTable({ balances }: { balances: InventoryBalance
                   <p className="font-medium text-ink">{balance.product?.name ?? '—'}</p>
                   <p className="text-xs text-muted">{balance.product?.sku ?? '—'}</p>
                 </TableCell>
-                <TableCell align="right"><span className="text-ink">{balance.onHandQuantity}</span></TableCell>
-                <TableCell align="right"><span className="text-muted">{balance.reservedQuantity}</span></TableCell>
-                <TableCell align="right" className={`font-semibold ${Number(balance.availableQuantity) <= 0 ? 'text-danger-text' : 'text-ink'}`}>{balance.availableQuantity}</TableCell>
-                <TableCell align="right"><span className="text-muted">{balance.incomingQuantity}</span></TableCell>
+                <TableCell align="right"><span className="text-ink">{formatQuantity(balance.onHandQuantity)}</span></TableCell>
+                <TableCell align="right"><span className="text-muted">{formatQuantity(balance.reservedQuantity)}</span></TableCell>
+                <TableCell align="right" className={`font-semibold ${Number(balance.availableQuantity) <= 0 ? 'text-danger-text' : 'text-ink'}`}>{formatQuantity(balance.availableQuantity)}</TableCell>
+                <TableCell align="right"><span className="text-muted">{formatQuantity(balance.incomingQuantity)}</span></TableCell>
                 <TableCell><span className="text-muted">{balance.lastMovementAt ? new Date(balance.lastMovementAt).toLocaleString() : '—'}</span></TableCell>
               </TableRow>
             ))}

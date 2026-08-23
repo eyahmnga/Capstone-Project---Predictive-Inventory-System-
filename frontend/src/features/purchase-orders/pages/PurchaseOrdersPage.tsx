@@ -2,6 +2,8 @@ import { type ChangeEvent, useEffect, useState } from 'react'
 import { FilePlus2, Search } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
+import { PendingPurchaseOrdersPanel } from '@/features/dashboard/components/PendingPurchaseOrdersPanel'
 import { useProductOptions, useUnitOptions } from '@/features/products/hooks/useProducts'
 import { useSupplierOptions } from '@/features/suppliers/hooks/useSuppliers'
 import {
@@ -40,6 +42,7 @@ export default function PurchaseOrdersPage() {
   }, [defaultBranchId, filters.branchId])
 
   const poQuery = usePurchaseOrders(filters)
+  const dashboardQuery = useDashboard(filters.branchId ?? undefined)
   const supplierOptionsQuery = useSupplierOptions()
   const productOptionsQuery = useProductOptions()
   const unitOptionsQuery = useUnitOptions()
@@ -75,6 +78,14 @@ export default function PurchaseOrdersPage() {
     <div className="space-y-6">
       <PageHeader title="Purchase orders" description="Draft, submit, and approve purchase orders for your branch." actions={<Button disabled={!filters.branchId} onClick={() => setIsFormOpen(true)}><FilePlus2 aria-hidden="true" size={18} /> Create purchase order</Button>} />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
+
+      {/* Relocated Pending Procurement Panel */}
+      {dashboardQuery.data ? (
+        <PendingPurchaseOrdersPanel
+          count={dashboardQuery.data.data.pendingPurchaseOrders.count}
+          items={dashboardQuery.data.data.pendingPurchaseOrders.items}
+        />
+      ) : null}
 
       <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_180px_180px]">
         <label className="relative block"><span className="sr-only">Search by PO number</span><Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} /><input className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" placeholder="Search by PO number" value={filters.search} onChange={(event: ChangeEvent<HTMLInputElement>) => updateFilter('search', event.target.value)} /></label>

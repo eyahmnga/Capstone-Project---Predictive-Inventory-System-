@@ -35,6 +35,7 @@ export async function createProduct(values: ProductFormValues): Promise<Product>
     barcode: values.barcode || undefined,
     name: values.name,
     description: values.description || undefined,
+    imageUrl: values.imageUrl || undefined,
     productType: values.productType,
     defaultTaxRate: values.defaultTaxRate,
     sellingPrice: values.sellingPrice,
@@ -54,6 +55,7 @@ export async function updateProduct(product: Product, values: ProductFormValues)
     barcode: values.barcode || null,
     name: values.name,
     description: values.description || null,
+    imageUrl: values.imageUrl || null,
     productType: values.productType,
     defaultTaxRate: values.defaultTaxRate,
     sellingPrice: values.sellingPrice,
@@ -62,6 +64,17 @@ export async function updateProduct(product: Product, values: ProductFormValues)
     isSerialTracked: values.isSerialTracked,
     isExpiryTracked: values.isExpiryTracked,
     version: product.version,
+  })
+  return response.data.data
+}
+
+export async function uploadProductImage(file: File): Promise<{ url: string; path: string }> {
+  const formData = new FormData()
+  formData.append('image', file)
+  const response = await apiClient.post<{ data: { url: string; path: string } }>('/products/upload-image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   })
   return response.data.data
 }

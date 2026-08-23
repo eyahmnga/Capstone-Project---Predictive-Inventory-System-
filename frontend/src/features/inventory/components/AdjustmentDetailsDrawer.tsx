@@ -7,6 +7,7 @@ import { AdjustmentStatusBadge } from '@/features/inventory/components/Adjustmen
 import { ReasonPromptDialog } from '@/features/inventory/components/ReasonPromptDialog'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type AdjustmentDetailsDrawerProps = {
@@ -44,9 +45,9 @@ export function AdjustmentDetailsDrawer({ adjustment, isActing, onClose, onAppro
                   <p className="font-medium text-ink">{line.productName}</p>
                   <p className="text-xs text-muted">{line.productSku}</p>
                   <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div><dt className="text-muted">Before</dt><dd className="tabular-nums text-ink">{line.beforeQuantity}</dd></div>
-                    <div><dt className="text-muted">Delta</dt><dd className={`tabular-nums font-semibold ${Number(line.quantityDelta) > 0 ? 'text-success-text' : 'text-danger-text'}`}>{Number(line.quantityDelta) > 0 ? '+' : ''}{line.quantityDelta}</dd></div>
-                    <div><dt className="text-muted">After</dt><dd className="tabular-nums text-ink">{line.afterQuantity}</dd></div>
+                    <div><dt className="text-muted">Before</dt><dd className="tabular-nums text-ink">{formatQuantity(line.beforeQuantity)}</dd></div>
+                    <div><dt className="text-muted">Delta</dt><dd className={`tabular-nums font-semibold ${Number(line.quantityDelta) > 0 ? 'text-success-text' : 'text-danger-text'}`}>{Number(line.quantityDelta) > 0 ? '+' : ''}{formatQuantity(line.quantityDelta)}</dd></div>
+                    <div><dt className="text-muted">After</dt><dd className="tabular-nums text-ink">{formatQuantity(line.afterQuantity)}</dd></div>
                   </dl>
                 </div>
               ))}
@@ -58,11 +59,11 @@ export function AdjustmentDetailsDrawer({ adjustment, isActing, onClose, onAppro
                   {adjustment.lines.map((line) => (
                     <tr key={line.id}>
                       <td className="px-3 py-2"><p className="font-medium text-ink">{line.productName}</p><p className="text-xs text-muted">{line.productSku}</p></td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.beforeQuantity}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.beforeQuantity)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums font-semibold ${Number(line.quantityDelta) > 0 ? 'text-success-text' : 'text-danger-text'}`}>
-                        {Number(line.quantityDelta) > 0 ? '+' : ''}{line.quantityDelta}
+                        {Number(line.quantityDelta) > 0 ? '+' : ''}{formatQuantity(line.quantityDelta)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.afterQuantity}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.afterQuantity)}</td>
                     </tr>
                   ))}
                 </tbody>

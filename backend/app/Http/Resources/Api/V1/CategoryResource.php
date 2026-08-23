@@ -23,9 +23,7 @@ class CategoryResource extends JsonResource
             'name' => $category->name,
             'description' => $category->description,
             'isActive' => (bool) $category->is_active,
-            // Product association is not yet implemented (deferred to the
-            // Catalog/Inventory milestone); reported as 0 until real.
-            'productCount' => 0,
+            'productCount' => (int) ($category->products_count ?? ($category->relationLoaded('products') ? $category->products->count() : $category->products()->count())),
             'updatedAt' => $category->updated_at?->toIso8601String(),
             'version' => $category->row_version,
         ];

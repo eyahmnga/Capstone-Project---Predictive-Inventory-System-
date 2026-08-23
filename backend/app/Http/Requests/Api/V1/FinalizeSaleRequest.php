@@ -28,6 +28,7 @@ class FinalizeSaleRequest extends FormRequest
             'branchId' => ['required', 'integer', Rule::exists('branches', 'id')->where('is_active', true)],
             'soldAt' => ['required', 'date'],
             'currencyCode' => ['required', 'string', 'size:3'],
+            'taxExempt' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'approvedByUserId' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'lines' => ['required', 'array', 'min:1'],

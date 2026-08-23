@@ -5,6 +5,7 @@ import { ManualPlanDialog } from '@/features/forecasting/components/ManualPlanDi
 import type { ForecastRun, ForecastRunItem } from '@/features/forecasting/types/forecast'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type ForecastRunDetailsDrawerProps = {
@@ -44,8 +45,8 @@ export function ForecastRunDetailsDrawer({ run, canOverride, isSaving, onClose, 
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <ColdStartBadge status={item.coldStartStatus} />
                   <dl className="flex gap-4 text-xs">
-                    <div><dt className="text-muted">Demand</dt><dd className="tabular-nums text-ink">{item.demandTotal}</dd></div>
-                    <div><dt className="text-muted">Forecast</dt><dd className="tabular-nums font-semibold text-ink">{item.coldStartStatus === 'manual_override' ? item.manualQuantity : (item.forecastQuantity ?? '—')}</dd></div>
+                    <div><dt className="text-muted">Demand</dt><dd className="tabular-nums text-ink">{formatQuantity(item.demandTotal)}</dd></div>
+                    <div><dt className="text-muted">Forecast</dt><dd className="tabular-nums font-semibold text-ink">{item.coldStartStatus === 'manual_override' ? formatQuantity(item.manualQuantity) : formatQuantity(item.forecastQuantity)}</dd></div>
                   </dl>
                 </div>
               </div>
@@ -60,9 +61,9 @@ export function ForecastRunDetailsDrawer({ run, canOverride, isSaving, onClose, 
                 {run.items.map((item) => (
                   <tr key={item.productId}>
                     <td className="px-3 py-2"><p className="font-medium text-ink">{item.productName}</p><p className="text-xs text-muted">{item.productSku}</p></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{item.demandTotal}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(item.demandTotal)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">
-                      {item.coldStartStatus === 'manual_override' ? item.manualQuantity : (item.forecastQuantity ?? '—')}
+                      {item.coldStartStatus === 'manual_override' ? formatQuantity(item.manualQuantity) : formatQuantity(item.forecastQuantity)}
                     </td>
                     <td className="px-3 py-2"><ColdStartBadge status={item.coldStartStatus} /></td>
                     <td className="px-3 py-2 text-right">

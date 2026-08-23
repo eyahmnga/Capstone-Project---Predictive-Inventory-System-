@@ -74,6 +74,7 @@ class UserController extends Controller
                 'display_name' => trim($validated['firstName'].' '.$validated['lastName']),
                 'email' => mb_strtolower($validated['email']),
                 'phone' => $validated['phone'] ?? null,
+                'avatar_url' => $validated['avatarUrl'] ?? null,
                 'is_active' => $validated['isActive'] ?? true,
                 'password_hash' => Hash::make(Str::password(16)),
             ],
@@ -112,8 +113,17 @@ class UserController extends Controller
             'last_name' => $validated['lastName'] ?? null,
             'email' => isset($validated['email']) ? mb_strtolower($validated['email']) : null,
             'phone' => array_key_exists('phone', $validated) ? $validated['phone'] : null,
+            'avatar_url' => array_key_exists('avatarUrl', $validated) ? $validated['avatarUrl'] : null,
             'is_active' => $validated['isActive'] ?? null,
         ], fn ($value) => $value !== null);
+
+        if (array_key_exists('avatarUrl', $validated) && $validated['avatarUrl'] === null) {
+            $attributes['avatar_url'] = null;
+        }
+
+        if (array_key_exists('phone', $validated) && $validated['phone'] === null) {
+            $attributes['phone'] = null;
+        }
 
         if (isset($validated['firstName']) || isset($validated['lastName'])) {
             $attributes['display_name'] = trim(($validated['firstName'] ?? $user->first_name).' '.($validated['lastName'] ?? $user->last_name));
@@ -139,5 +149,27 @@ class UserController extends Controller
         }
 
         return new UserResource($updated);
+    }
+
+    public function uploadAvatar(Request $request): JsonResponse
+    {
+        $this->authorize('create', User::class);
+
+        $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp,svg', 'max:5120'],
+        ]);
+
+        $file = $request->file('avatar');
+        $filename = (string) Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('avatars', $filename, 'public');
+
+        $url = asset('storage/' . $path);
+
+        return response()->json([
+            'data' => [
+                'url' => $url,
+                'path' => $path,
+            ],
+        ]);
     }
 }

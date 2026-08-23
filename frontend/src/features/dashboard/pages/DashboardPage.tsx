@@ -1,203 +1,357 @@
-import {
-  AlertCircle,
-  Boxes,
-  CircleAlert,
-  PackageCheck,
-  RefreshCw,
-  TrendingUp,
-} from 'lucide-react'
-
+import { useMemo, useState } from 'react'
+import { AlertCircle, RefreshCw } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
+import { createProduct, productQueryKeys } from '@/features/products/api/productsApi'
+import { ProductFormDialog } from '@/features/products/components/ProductFormDialog'
+import { useCategoryOptions, useProducts, useUnitOptions } from '@/features/products/hooks/useProducts'
+import type { ProductFormValues } from '@/features/products/types/product'
+import { useForecastRun, useForecastRuns } from '@/features/forecasting/hooks/useForecast'
+import { useReorderPolicies, useRestockingAlerts } from '@/features/restocking/hooks/useRestocking'
+import { classifyProductStock } from '@/features/inventory/lib/stockClassification'
+
+import { KpiCardsRow } from '@/features/dashboard/components/KpiCardsRow'
+import { DashboardQuickActionsCard } from '@/features/dashboard/components/DashboardQuickActionsCard'
+import { FastSlowMovingProductsChart } from '@/features/dashboard/components/FastSlowMovingProductsChart'
+import { HistoricalValueAreaChart, type MonthlyDataPoint } from '@/features/dashboard/components/HistoricalValueAreaChart'
+import { ProjectionForecastLineChart, type ForecastDataPoint } from '@/features/dashboard/components/ProjectionForecastLineChart'
+import { DashboardAlertsRow, type BottomAlertItem } from '@/features/dashboard/components/DashboardAlertsRow'
 
 import { ForecastSummaryPanel } from '@/features/dashboard/components/ForecastSummaryPanel'
-import { LowStockTable } from '@/features/dashboard/components/LowStockTable'
-import { MetricCard } from '@/features/dashboard/components/MetricCard'
 import { PendingPurchaseOrdersPanel } from '@/features/dashboard/components/PendingPurchaseOrdersPanel'
 import { RecentSalesPanel } from '@/features/dashboard/components/RecentSalesPanel'
-import { SalesTrendTable } from '@/features/dashboard/components/SalesTrendTable'
 import { SyncHealthPanel } from '@/features/dashboard/components/SyncHealthPanel'
 
 import { type ApiError } from '@/shared/api/client'
 import { Button } from '@/shared/components/Button'
+import { useToast } from '@/shared/components/Toast'
 
 export default function DashboardPage() {
   const { session } = useAuth()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
 
-  const branchId =
-    (
-      session?.user.branches.find((branch) => branch.isDefault) ??
-      session?.user.branches[0]
-    )?.id
+  const defaultBranch =
+    session?.user.branches.find((branch) => branch.isDefault) ??
+    session?.user.branches[0]
 
+  const branchId = defaultBranch?.id
+
+  // Telemetry queries connecting to backend database services
   const dashboardQuery = useDashboard(branchId)
+  const productsQuery = useProducts({
+    branchId: branchId ?? null,
+    categoryId: 'all',
+    productType: 'all',
+    active: 'active',
+    search: '',
+    page: 1,
+    perPage: 100,
+  })
+  const alertsQuery = useRestockingAlerts({
+    branchId: branchId ?? null,
+    status: 'active',
+    severity: 'all',
+    page: 1,
+    perPage: 100,
+  })
+  const reorderPoliciesQuery = useReorderPolicies({
+    branchId: branchId ?? null,
+    page: 1,
+    perPage: 100,
+  })
+  const forecastRunsQuery = useForecastRuns({
+    branchId: branchId ?? null,
+    page: 1,
+    perPage: 10,
+  })
 
-  const error = dashboardQuery.error as ApiError | null
+  const categoryOptionsQuery = useCategoryOptions()
+  const unitOptionsQuery = useUnitOptions()
+
+  const latestForecastRunId = forecastRunsQuery.data?.data?.[0]?.id
+  const forecastDetailQuery = useForecastRun(latestForecastRunId)
+
+  // Product Creation Mutation from Dashboard Quick Action
+  const createProductMutation = useMutation({
+    mutationFn: createProduct,
+    onSuccess: (product) => {
+      void queryClient.invalidateQueries({ queryKey: productQueryKeys.lists() })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      void productsQuery.refetch()
+      setIsProductModalOpen(false)
+      toast({
+        title: 'Product created',
+        description: `${product.name} (${product.sku}) was added to catalog`,
+        variant: 'success',
+      })
+    },
+  })
+
+  // 1. KPI dynamic data connection
+  const kpiData = useMemo(() => {
+    const products = productsQuery.data?.data ?? []
+    const policies = reorderPoliciesQuery.data?.data ?? []
+    const alerts = alertsQuery.data?.data ?? []
+
+    const computedValuation = products.reduce((sum, p) => {
+      const qty = Number(p.stock?.onHandQuantity) || 0
+      const price = Number(p.sellingPrice) || 0
+      return sum + qty * price
+    }, 0)
+
+    const totalCount = productsQuery.data?.meta.total ?? products.length
+
+    let lowCount = 0
+    let outOfStockCount = 0
+    let overstockCount = 0
+
+    products.forEach((p) => {
+      const status = classifyProductStock(p, policies, alerts)
+      if (status === 'out_of_stock') outOfStockCount++
+      else if (status === 'low_stock') lowCount++
+      else if (status === 'overstock') overstockCount++
+    })
+
+    return {
+      totalInventoryValue: computedValuation,
+      totalItems: totalCount,
+      lowStockCount: lowCount,
+      overstockCount: overstockCount,
+      outOfStockCount: outOfStockCount,
+      growthPercent: '+0.0%',
+    }
+  }, [productsQuery.data, reorderPoliciesQuery.data, alertsQuery.data])
+
+  // 2. Dynamic Historical Area Chart data from Sales Trend
+  const historicalPoints: MonthlyDataPoint[] = useMemo(() => {
+    const trend = dashboardQuery.data?.data.salesTrend ?? []
+    if (trend.length > 0) {
+      return trend.slice(-6).map((pt) => ({
+        label: pt.date.slice(5),
+        value: Number(pt.totalAmount) || 0,
+      }))
+    }
+    return []
+  }, [dashboardQuery.data])
+
+  // 3. Dynamic Projection Forecast points from SMA forecast run
+  const forecastPoints: ForecastDataPoint[] = useMemo(() => {
+    const items = forecastDetailQuery.data?.items ?? []
+    const defaultLabels = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov']
+    if (items.length > 0) {
+      return items.slice(0, 6).map((item, idx) => {
+        const baseForecast = Math.round(Number(item.forecastQuantity)) || 0
+        return {
+          label: defaultLabels[idx % defaultLabels.length],
+          forecast: baseForecast,
+          upper: Math.round(baseForecast * 1.2),
+          lower: Math.max(0, Math.round(baseForecast * 0.8)),
+        }
+      })
+    }
+    return []
+  }, [forecastDetailQuery.data])
+
+  // 4. Dynamic Alert Feed synthesized strictly from live backend events
+  const alertsFeed: BottomAlertItem[] = useMemo(() => {
+    const list: BottomAlertItem[] = []
+
+    const formatAlertDate = (dateStr: string | null | undefined) => {
+      if (!dateStr) return 'Just now'
+      try {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return 'Just now'
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        return `${datePart} • ${timePart}`
+      } catch {
+        return 'Just now'
+      }
+    }
+
+    // 1. Out of stock / Critical alert
+    const criticalAlert = alertsQuery.data?.data.find((a) => a.severity === 'critical')
+    if (criticalAlert) {
+      list.push({
+        id: `alt-crit-${criticalAlert.id}`,
+        type: 'out_of_stock',
+        title: `${criticalAlert.productName ?? 'Product'} is out of stock.`,
+        timestamp: formatAlertDate(criticalAlert.firstTriggeredAt ?? criticalAlert.lastEvaluatedAt),
+        link: '/restocking',
+      })
+    }
+
+    // 2. Low stock alert
+    const lowAlert = alertsQuery.data?.data.find((a) => ['high', 'medium', 'low'].includes(a.severity))
+    if (lowAlert) {
+      list.push({
+        id: `alt-low-${lowAlert.id}`,
+        type: 'low_stock',
+        title: `${lowAlert.productName ?? 'Product'} is running low.`,
+        timestamp: formatAlertDate(lowAlert.firstTriggeredAt ?? lowAlert.lastEvaluatedAt),
+        link: '/restocking',
+      })
+    }
+
+    // 3. Demand forecast run
+    const forecastRun = forecastRunsQuery.data?.data?.[0]
+    if (forecastRun) {
+      const count = forecastRun.itemCount ?? forecastRun.items?.length ?? 0
+      list.push({
+        id: `alt-fc-${forecastRun.id}`,
+        type: 'forecast',
+        title: `Demand forecast updated for ${count} items.`,
+        timestamp: formatAlertDate(forecastRun.createdAt),
+        link: '/forecasting',
+      })
+    }
+
+    // 4. New order received
+    const recentSale = dashboardQuery.data?.data.recentSales?.[0]
+    if (recentSale) {
+      list.push({
+        id: `alt-sale-${recentSale.id}`,
+        type: 'order',
+        title: `New order #${recentSale.saleNumber} received.`,
+        timestamp: formatAlertDate(recentSale.soldAt),
+        link: '/sales',
+      })
+    }
+
+    return list
+  }, [alertsQuery.data, forecastRunsQuery.data, dashboardQuery.data])
+
+  const handleSaveProduct = (values: ProductFormValues) => {
+    createProductMutation.mutate(values)
+  }
+
+  const error = (dashboardQuery.error ?? createProductMutation.error) as ApiError | null
 
   return (
-    <div className="space-y-5">
-
-      {/* Compact Header */}
-      <section className="flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
-
+    <div className="space-y-5 sm:space-y-6 pb-10">
+      {/* Header & Refresh */}
+      <div className="flex items-center justify-between">
         <div className="min-w-0">
-
-          <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-            Dashboard
+          <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">
+            Inventory Dashboard
           </h1>
-
-          {dashboardQuery.data && (
-            <p className="mt-2 text-xs text-muted">
-              Updated{' '}
-              {new Date(
-                dashboardQuery.data.meta.generatedAt,
-              ).toLocaleString()}
-              {' • '}
-              {dashboardQuery.data.meta.from}
-              {' – '}
-              {dashboardQuery.data.meta.to}
-              {' • '}
-              {dashboardQuery.data.meta.currency}
-            </p>
-          )}
-
+          <p className="text-xs text-slate-500">
+            Real-time analytics, predictive demand optimization, and operational feeds
+          </p>
         </div>
-
         <Button
-          aria-label="Refresh dashboard"
-          size="icon"
-          variant="secondary"
+          aria-label="Refresh dashboard data"
+          className="h-9 rounded-lg px-3"
           disabled={dashboardQuery.isFetching}
-          onClick={() => void dashboardQuery.refetch()}
+          variant="secondary"
+          onClick={() => {
+            void dashboardQuery.refetch()
+            void productsQuery.refetch()
+            void alertsQuery.refetch()
+            void reorderPoliciesQuery.refetch()
+            void forecastRunsQuery.refetch()
+          }}
         >
           <RefreshCw
             aria-hidden="true"
-            size={16}
-            className={
-              dashboardQuery.isFetching
-                ? 'animate-spin'
-                : undefined
-            }
+            className={`mr-1.5 ${dashboardQuery.isFetching ? 'animate-spin text-blue-600' : 'text-slate-500'}`}
+            size={14}
           />
+          <span className="text-xs font-semibold">Refresh</span>
         </Button>
-
-      </section>
+      </div>
 
       {!branchId ? (
         <div
-          className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-text"
+          className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning-text"
           role="status"
         >
           You are not assigned to a branch, so no dashboard data is available.
         </div>
-      ) : dashboardQuery.isLoading ? (
-        <div
-          className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"
-          role="status"
-        >
-          {[1, 2, 3, 4].map((key) => (
-            <div
-              key={key}
-              className="h-36 animate-pulse rounded-card border border-border bg-subtle"
-            />
-          ))}
-        </div>
       ) : dashboardQuery.isError && error ? (
         <div
-          className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text"
+          className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger-text"
           role="alert"
         >
           <AlertCircle aria-hidden="true" size={16} />
-          {error.message}
-          {error.requestId
-            ? ` Request ID: ${error.requestId}`
-            : ''}
+          <span>{error.message}</span>
         </div>
-      ) : dashboardQuery.data ? (
+      ) : (
         <>
+          {/* Row 1: 5 KPI Cards */}
+          <KpiCardsRow data={kpiData} />
 
-          {/* KPI Cards */}
+          {/* Row 2: Quick Actions (Left) & Demand Projection Chart (Right) */}
+          <section aria-label="Quick Actions and Demand Forecast" className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <DashboardQuickActionsCard onAddProduct={() => setIsProductModalOpen(true)} />
+            <ProjectionForecastLineChart data={forecastPoints} />
+          </section>
 
-          <section
-            aria-label="Operational summary"
-            className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            <MetricCard
-              icon={<Boxes aria-hidden="true" size={22} />}
-              metric={dashboardQuery.data.data.kpis.inventoryOnHand}
-              tone="default"
-            />
-
-            <MetricCard
-              icon={<TrendingUp aria-hidden="true" size={22} />}
-              isCurrency
-              metric={dashboardQuery.data.data.kpis.salesToday}
-              tone="success"
-            />
-
-            <MetricCard
-              icon={<PackageCheck aria-hidden="true" size={22} />}
-              metric={dashboardQuery.data.data.kpis.lowStockCount}
-              tone="warning"
-            />
-
-            <MetricCard
-              icon={<CircleAlert aria-hidden="true" size={22} />}
-              metric={dashboardQuery.data.data.kpis.criticalStockCount}
-              tone="danger"
+          {/* Fast & Slow Moving Product Movement Graph (Above Recent Alerts) */}
+          <section aria-label="Fast and Slow Moving Products">
+            <FastSlowMovingProductsChart
+              forecastItems={forecastDetailQuery.data?.items}
+              products={productsQuery.data?.data}
             />
           </section>
 
-          {/* Main Row */}
+          {/* Real-time System Alerts & Activity Feed (Full-Width Pill Row) */}
+          <DashboardAlertsRow alerts={alertsFeed} />
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+          {/* Additional Integrated Operational Modules */}
+          {dashboardQuery.data ? (
+            <div className="space-y-6 pt-2">
+              <div className="border-t border-slate-200/80 pt-6">
+                <h2 className="text-base font-bold text-slate-800">
+                  Operational Activity & Procurement
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Real-time transaction tracking and pending procurement orders
+                </p>
+              </div>
 
-            <LowStockTable
-              items={dashboardQuery.data.data.lowStock}
-            />
+              <section aria-label="Activity and Procurement" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <RecentSalesPanel sales={dashboardQuery.data.data.recentSales} />
+                <PendingPurchaseOrdersPanel
+                  count={dashboardQuery.data.data.pendingPurchaseOrders.count}
+                  items={dashboardQuery.data.data.pendingPurchaseOrders.items}
+                />
+              </section>
 
-            <RecentSalesPanel
-              sales={dashboardQuery.data.data.recentSales}
-            />
+              <div className="border-t border-slate-200/80 pt-6">
+                <h2 className="text-base font-bold text-slate-800">
+                  Demand Forecasting, Valuation Trends & System Synchronization
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Historical valuation metrics, model coverage analytics, and offline sync queue health
+                </p>
+              </div>
 
-          </section>
-
-          {/* Secondary */}
-
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-            <PendingPurchaseOrdersPanel
-              count={
-                dashboardQuery.data.data.pendingPurchaseOrders.count
-              }
-              items={
-                dashboardQuery.data.data.pendingPurchaseOrders.items
-              }
-            />
-
-            <ForecastSummaryPanel
-              summary={
-                dashboardQuery.data.data.forecastSummary
-              }
-            />
-
-          </section>
-
-          {/* Bottom */}
-
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-            <SalesTrendTable
-              points={dashboardQuery.data.data.salesTrend}
-            />
-
-            <SyncHealthPanel
-              health={dashboardQuery.data.data.syncHealth}
-            />
-
-          </section>
-
+              <section aria-label="Forecast, Valuation Trend, and Sync Health" className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <HistoricalValueAreaChart
+                  dailyData={dashboardQuery.data?.data.salesTrend}
+                  data={historicalPoints}
+                />
+                <ForecastSummaryPanel summary={dashboardQuery.data.data.forecastSummary} />
+                <SyncHealthPanel health={dashboardQuery.data.data.syncHealth} />
+              </section>
+            </div>
+          ) : null}
         </>
+      )}
+
+      {/* Product Form Dialog triggered directly from Quick Actions */}
+      {isProductModalOpen ? (
+        <ProductFormDialog
+          categoryOptions={categoryOptionsQuery.data ?? []}
+          isSaving={createProductMutation.isPending}
+          unitOptions={unitOptionsQuery.data ?? []}
+          onClose={() => setIsProductModalOpen(false)}
+          onSave={handleSaveProduct}
+        />
       ) : null}
     </div>
   )

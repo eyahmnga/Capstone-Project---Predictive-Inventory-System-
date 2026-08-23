@@ -6,6 +6,7 @@ import { PurchaseOrderStatusBadge } from '@/features/purchase-orders/components/
 import { ReasonPromptDialog } from '@/features/purchase-orders/components/ReasonPromptDialog'
 import { Button } from '@/shared/components/Button'
 import { drawerOverlayClass, drawerPanelClass } from '@/shared/lib/modalClasses'
+import { formatCurrency, formatQuantity } from '@/shared/lib/formatters'
 import { Portal } from '@/shared/components/Portal'
 
 type PurchaseOrderDetailsDrawerProps = {
@@ -43,9 +44,9 @@ export function PurchaseOrderDetailsDrawer({ purchaseOrder: po, isActing, onClos
                   <p className="font-medium text-ink">{line.productName}</p>
                   <p className="text-xs text-muted">{line.productSku}</p>
                   <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <div><dt className="text-muted">Qty</dt><dd className="tabular-nums text-ink">{line.orderedQuantity}</dd></div>
-                    <div><dt className="text-muted">Unit cost</dt><dd className="tabular-nums text-ink">{line.unitCost}</dd></div>
-                    <div><dt className="text-muted">Total</dt><dd className="tabular-nums text-ink">{line.totalAmount}</dd></div>
+                    <div><dt className="text-muted">Qty</dt><dd className="tabular-nums text-ink">{formatQuantity(line.orderedQuantity)}</dd></div>
+                    <div><dt className="text-muted">Unit cost</dt><dd className="tabular-nums text-ink">{formatCurrency(line.unitCost, po.currencyCode)}</dd></div>
+                    <div><dt className="text-muted">Total</dt><dd className="tabular-nums text-ink">{formatCurrency(line.totalAmount, po.currencyCode)}</dd></div>
                   </dl>
                 </div>
               ))}
@@ -57,19 +58,19 @@ export function PurchaseOrderDetailsDrawer({ purchaseOrder: po, isActing, onClos
                   {po.lines.map((line) => (
                     <tr key={line.id}>
                       <td className="px-3 py-2"><p className="font-medium text-ink">{line.productName}</p><p className="text-xs text-muted">{line.productSku}</p></td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.orderedQuantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.unitCost}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.totalAmount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(line.orderedQuantity)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(line.unitCost, po.currencyCode)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(line.totalAmount, po.currencyCode)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-              <Detail label="Subtotal" value={`${po.currencyCode} ${po.subtotalAmount}`} />
-              <Detail label="Tax" value={`${po.currencyCode} ${po.taxAmount}`} />
-              <Detail label="Discount" value={`${po.currencyCode} ${po.discountAmount}`} />
-              <Detail label="Total" value={`${po.currencyCode} ${po.totalAmount}`} />
+              <Detail label="Subtotal" value={formatCurrency(po.subtotalAmount, po.currencyCode)} />
+              <Detail label="Tax" value={formatCurrency(po.taxAmount, po.currencyCode)} />
+              <Detail label="Discount" value={formatCurrency(po.discountAmount, po.currencyCode)} />
+              <Detail label="Total" value={formatCurrency(po.totalAmount, po.currencyCode)} />
             </dl>
           </section>
           {po.approvals.length > 0 ? (

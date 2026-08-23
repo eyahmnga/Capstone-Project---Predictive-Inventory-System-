@@ -100,7 +100,7 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          'fixed bottom-0 left-0 top-16 z-40 flex w-[min(20rem,86vw)] flex-col bg-sidebar shadow-2xl shadow-slate-950/10 transition-transform duration-300 ease-out motion-reduce:transition-none lg:z-20 lg:translate-x-0 lg:shadow-none lg:transition-[width]',
+          'fixed bottom-0 left-0 top-16 z-40 flex w-[min(20rem,86vw)] flex-col border-r border-white/10 bg-sidebar shadow-2xl shadow-slate-950/10 transition-transform duration-300 ease-out motion-reduce:transition-none lg:z-20 lg:translate-x-0 lg:shadow-none lg:transition-[width]',
           isMobileNavOpen ? 'translate-x-0' : '-translate-x-full',
           isSidebarExpanded ? 'lg:w-sidebar-expanded' : 'lg:w-sidebar-collapsed',
         )}
@@ -110,17 +110,17 @@ export function AppSidebar() {
         onMouseLeave={closeHoveredSidebar}
       >
         <nav aria-label="Primary navigation" className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <SidebarItem
-            ariaLabel={sidebarNavigation.dashboard.ariaLabel}
-            icon={sidebarNavigation.dashboard.icon}
-            isExpanded={isSidebarExpanded}
-            label={sidebarNavigation.dashboard.label}
-            to={sidebarNavigation.dashboard.to}
-            variant="primary"
-            onNavigate={closeMobileNav}
-          />
-
-          <div className="my-5 border-t border-white/10" />
+          <div className="mb-6">
+            <SidebarItem
+              ariaLabel={sidebarNavigation.dashboard.ariaLabel}
+              icon={sidebarNavigation.dashboard.icon}
+              isExpanded={isSidebarExpanded}
+              label={sidebarNavigation.dashboard.label}
+              to={sidebarNavigation.dashboard.to}
+              variant="primary"
+              onNavigate={closeMobileNav}
+            />
+          </div>
 
           <div className="space-y-7">
             {visibleSections.map((section) => (

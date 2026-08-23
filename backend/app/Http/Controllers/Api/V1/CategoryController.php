@@ -26,7 +26,7 @@ class CategoryController extends Controller
         $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
         $page = max((int) $request->integer('page', 1), 1);
 
-        $query = Category::query()->with('parent');
+        $query = Category::query()->with('parent')->withCount('products');
 
         if ($search = trim((string) $request->query('search', ''))) {
             $query->where(function ($inner) use ($search) {
@@ -76,14 +76,14 @@ class CategoryController extends Controller
             return $this->exceptionResponse($exception);
         }
 
-        return (new CategoryResource($category->load('parent')))->response()->setStatusCode(201);
+        return (new CategoryResource($category->load('parent')->loadCount('products')))->response()->setStatusCode(201);
     }
 
     public function show(Category $category): CategoryResource
     {
         $this->authorize('view', $category);
 
-        return new CategoryResource($category->load('parent'));
+        return new CategoryResource($category->load('parent')->loadCount('products'));
     }
 
     public function update(UpdateCategoryRequest $request, Category $category): CategoryResource|JsonResponse

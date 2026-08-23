@@ -28,23 +28,25 @@ export function SidebarItem({
   return (
     <NavLink
       aria-label={ariaLabel ?? label}
-      to={to}
-      onClick={onNavigate}
       className={({ isActive }) =>
         cn(
-          'relative flex items-center rounded-lg outline-none transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-info',
-          'before:absolute before:left-0 before:rounded-r-full before:bg-transparent before:transition-colors before:duration-150',
-          isPrimary ? 'h-11 gap-3 px-3 text-sm font-semibold before:top-2 before:h-7 before:w-[3px]' : 'h-11 px-3 pl-4 text-sm before:top-3 before:h-5 before:w-[3px]',
-          isActive ? 'bg-white/10 text-white before:bg-info' : 'text-white/60 hover:bg-white/5 hover:text-white',
+          'relative flex items-center rounded-lg outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-info',
+          isPrimary ? 'h-11 gap-3 px-3 text-sm font-semibold' : 'h-11 px-3 pl-4 text-sm font-medium',
+          isActive
+            ? 'bg-blue-800/50 text-white border-l-4 border-blue-400 font-semibold shadow-sm'
+            : 'text-white/70 hover:bg-white/5 hover:text-white border-l-4 border-transparent',
         )
       }
+      title={!isExpanded ? label : undefined}
+      to={to}
+      onClick={onNavigate}
     >
       {({ isActive }) => (
         <>
           {Icon ? (
             <Icon
               aria-hidden="true"
-              className={cn('shrink-0 transition-colors duration-150', isActive && 'text-info')}
+              className={cn('shrink-0 transition-colors duration-150', isActive ? 'text-blue-300' : 'text-white/70')}
               size={18}
             />
           ) : null}

@@ -3,10 +3,10 @@ import { finalizeSale, getPosProducts, posProductQueryKeys } from '@/features/po
 import { saleQueryKeys } from '@/features/sales/api/salesApi'
 import type { FinalizeSalePayload } from '@/features/pos/types/pos'
 
-export function usePosProducts(branchId: string | null, query: string) {
+export function usePosProducts(branchId: string | null, query: string, categoryId?: string) {
   return useQuery({
-    queryKey: posProductQueryKeys.list(branchId, query),
-    queryFn: () => getPosProducts(branchId as string, query),
+    queryKey: posProductQueryKeys.list(branchId, query, categoryId),
+    queryFn: () => getPosProducts(branchId as string, query, categoryId),
     enabled: branchId !== null,
   })
 }

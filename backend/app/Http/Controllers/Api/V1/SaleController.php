@@ -49,10 +49,14 @@ class SaleController extends Controller
             throw new AuthorizationException;
         }
 
-        $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
+        $perPage = min(max((int) $request->integer('perPage', 100), 1), 100);
         $page = max((int) $request->integer('page', 1), 1);
 
         $query = Product::query()->with(['category', 'stockUnit'])->where('is_active', true);
+
+        if ($request->filled('categoryId') && $request->query('categoryId') !== 'all') {
+            $query->where('category_id', (int) $request->query('categoryId'));
+        }
 
         if ($barcode = trim((string) $request->query('barcode', ''))) {
             $query->where('barcode', $barcode);
@@ -147,7 +151,7 @@ class SaleController extends Controller
     {
         $this->authorize('view', $sale);
 
-        return new SaleResource($sale->load(['lines', 'payments', 'cashier', 'reversesSale']));
+        return new SaleResource($sale->load(['lines', 'payments', 'cashier', 'branch', 'reversesSale']));
     }
 
     public function store(FinalizeSaleRequest $request): JsonResponse
@@ -179,6 +183,7 @@ class SaleController extends Controller
                 'branch_id' => $validated['branchId'],
                 'sold_at' => $validated['soldAt'],
                 'currency_code' => $validated['currencyCode'],
+                'tax_exempt' => (bool) ($validated['taxExempt'] ?? false),
                 'notes' => $validated['notes'] ?? null,
                 'approved_by_user_id' => $validated['approvedByUserId'] ?? null,
                 'idempotency_key' => $idempotencyKey,
@@ -200,7 +205,7 @@ class SaleController extends Controller
             return $this->exceptionResponse($exception);
         }
 
-        $responseBody = ['data' => (new SaleResource($sale))->response()->getData(true)['data']];
+        $responseBody = ['data' => (new SaleResource($sale->load(['lines', 'payments', 'cashier', 'branch'])))->response()->getData(true)['data']];
         $this->idempotencyGuard->complete($request->user(), 'sales.finalize', $idempotencyKey, 201, $responseBody, 'sale', $sale->id);
 
         return response()->json($responseBody, 201);

@@ -14,23 +14,26 @@ export function effectiveUnitPrice(line: Pick<CartLine, 'catalogUnitPrice' | 'ov
   return line.overriddenUnitPrice ?? line.catalogUnitPrice
 }
 
-export function computeLineTotals(line: Pick<CartLine, 'quantity' | 'catalogUnitPrice' | 'overriddenUnitPrice' | 'discountAmount' | 'taxRate'>): LineTotals {
+export function computeLineTotals(
+  line: Pick<CartLine, 'quantity' | 'catalogUnitPrice' | 'overriddenUnitPrice' | 'discountAmount' | 'taxRate'>,
+  isTaxIncluded = true,
+): LineTotals {
   const unitPrice = Number(effectiveUnitPrice(line))
   const discount = Number(line.discountAmount || '0')
-  const taxRate = Number(line.taxRate)
+  const taxRate = isTaxIncluded ? Number(line.taxRate) : 0
 
   const grossAmount = line.quantity * unitPrice
   const netAmount = Math.max(0, grossAmount - discount)
-  const taxAmount = netAmount * (taxRate / 100)
+  const taxAmount = isTaxIncluded ? netAmount * (taxRate / 100) : 0
   const totalAmount = netAmount + taxAmount
 
   return { grossAmount, netAmount, taxAmount, totalAmount }
 }
 
-export function computeCartTotals(lines: CartLine[]): CartTotals {
+export function computeCartTotals(lines: CartLine[], isTaxIncluded = true): CartTotals {
   return lines.reduce<CartTotals>(
     (acc, line) => {
-      const totals = computeLineTotals(line)
+      const totals = computeLineTotals(line, isTaxIncluded)
       return {
         subtotal: acc.subtotal + totals.grossAmount,
         discount: acc.discount + Number(line.discountAmount || '0'),

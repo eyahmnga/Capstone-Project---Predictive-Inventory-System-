@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             PermissionSeeder::class,
             BranchSeeder::class,
-            OwnerUserSeeder::class,
+            UserSeeder::class,
             UnitOfMeasureSeeder::class,
             DemoDataSeeder::class,
         ]);

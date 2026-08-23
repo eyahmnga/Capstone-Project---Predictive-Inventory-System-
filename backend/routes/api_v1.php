@@ -10,6 +10,8 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->m
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/auth/avatar', [AuthController::class, 'uploadAvatar']);
+    Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
 
     require __DIR__.'/api_v1_dashboard.php';
     require __DIR__.'/api_v1_identity.php';

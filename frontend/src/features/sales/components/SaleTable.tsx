@@ -4,6 +4,7 @@ import { SaleStatusBadge } from '@/features/sales/components/SaleStatusBadge'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatQuantity } from '@/shared/lib/formatters'
 
 export function SaleTable({ sales, onView }: { sales: Sale[]; onView: (sale: Sale) => void }) {
   return (
@@ -22,7 +23,7 @@ export function SaleTable({ sales, onView }: { sales: Sale[]; onView: (sale: Sal
               fields={[
                 { label: 'Sold at', value: sale.soldAt ? new Date(sale.soldAt).toLocaleString() : '—', full: true },
                 { label: 'Lines', value: sale.lineCount ?? '—' },
-                { label: 'Total', value: sale.totalAmount },
+                { label: 'Total', value: formatQuantity(sale.totalAmount) },
               ]}
               onClick={() => onView(sale)}
             />
@@ -54,7 +55,7 @@ export function SaleTable({ sales, onView }: { sales: Sale[]; onView: (sale: Sal
                   <TableCell><SaleStatusBadge status={sale.status} /></TableCell>
                   <TableCell className="text-muted">{sale.soldAt ? new Date(sale.soldAt).toLocaleString() : '—'}</TableCell>
                   <TableCell align="right" className="text-ink">{sale.lineCount ?? '—'}</TableCell>
-                  <TableCell align="right" className="font-semibold text-ink">{sale.totalAmount}</TableCell>
+                  <TableCell align="right" className="font-semibold text-ink">{formatQuantity(sale.totalAmount)}</TableCell>
                   <TableCell align="right">
                     <div className="flex justify-end gap-1">
                       <Button aria-label={`View ${sale.saleNumber}`} size="icon" variant="ghost" onClick={() => onView(sale)}><PanelRightOpen aria-hidden="true" size={18} /></Button>

@@ -68,8 +68,9 @@ class SaleService
             $taxTotal = '0.0000';
             $total = '0.0000';
 
+            $taxExempt = ! empty($data['tax_exempt']);
             foreach ($data['lines'] as $lineInput) {
-                $built = $this->buildSaleLine($lineInput, $actor, $approver, $lineNumber++);
+                $built = $this->buildSaleLine($lineInput, $actor, $approver, $lineNumber++, $taxExempt);
                 $builtLines[] = $built;
                 $subtotal = bcadd($subtotal, $built['gross_amount'], 4);
                 $discountTotal = bcadd($discountTotal, $built['discount_amount'], 4);
@@ -365,7 +366,7 @@ class SaleService
      * @param array{product_id:int, unit_id:int, quantity:numeric-string|float|int, requested_unit_price?:numeric-string|float|int|null, discount_amount?:numeric-string|float|int|null, override_reason?:?string} $lineInput
      * @return array{line_number:int, product:Product, unit_id:int, quantity:string, unit_price:string, discount_amount:string, tax_rate:string, gross_amount:string, tax_amount:string, total_amount:string, override_reason:?string}
      */
-    private function buildSaleLine(array $lineInput, User $actor, ?User $approver, int $lineNumber): array
+    private function buildSaleLine(array $lineInput, User $actor, ?User $approver, int $lineNumber, bool $taxExempt = false): array
     {
         $product = Product::query()->findOrFail($lineInput['product_id']);
 
@@ -407,7 +408,7 @@ class SaleService
         }
 
         $unitPrice = $priceOverridden ? $requestedPrice : $basePrice;
-        $taxRate = (string) $product->default_tax_rate;
+        $taxRate = $taxExempt ? '0.0000' : (string) $product->default_tax_rate;
 
         $grossAmount = bcmul($quantity, $unitPrice, 4);
         $netAmount = bcsub($grossAmount, $discount, 4);

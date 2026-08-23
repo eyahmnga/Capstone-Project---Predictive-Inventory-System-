@@ -52,7 +52,7 @@ class RestockingAlertController extends Controller
         }
 
         $paginator = $query
-            ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderByDesc('last_evaluated_at')
             ->paginate($perPage, ['*'], 'page', $page);
 

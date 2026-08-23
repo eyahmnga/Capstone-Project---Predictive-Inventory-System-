@@ -4,6 +4,7 @@ import { PurchaseOrderStatusBadge } from '@/features/purchase-orders/components/
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
 import { Table, TableBody, TableCell, TableEmptyState, TableHead, TableHeaderCell, TableRow } from '@/shared/components/Table'
+import { formatCurrency } from '@/shared/lib/formatters'
 
 export function PurchaseOrderTable({ purchaseOrders, onView }: { purchaseOrders: PurchaseOrder[]; onView: (po: PurchaseOrder) => void }) {
   return (
@@ -20,7 +21,7 @@ export function PurchaseOrderTable({ purchaseOrders, onView }: { purchaseOrders:
               title={<span className="font-mono">{po.poNumber}</span>}
               subtitle={po.supplier?.legalName ?? undefined}
               fields={[
-                { label: 'Total', value: `${po.currencyCode} ${po.totalAmount}` },
+                { label: 'Total', value: formatCurrency(po.totalAmount, po.currencyCode) },
                 { label: 'Expected', value: po.expectedReceiptAt ? new Date(po.expectedReceiptAt).toLocaleDateString() : '—' },
               ]}
               onClick={() => onView(po)}
@@ -50,7 +51,7 @@ export function PurchaseOrderTable({ purchaseOrders, onView }: { purchaseOrders:
                   <TableCell className="font-mono text-xs font-semibold text-ink">{po.poNumber}</TableCell>
                   <TableCell className="text-muted">{po.supplier?.legalName ?? '—'}</TableCell>
                   <TableCell><PurchaseOrderStatusBadge status={po.status} /></TableCell>
-                  <TableCell align="right" className="text-ink">{po.currencyCode} {po.totalAmount}</TableCell>
+                  <TableCell align="right" className="text-ink">{formatCurrency(po.totalAmount, po.currencyCode)}</TableCell>
                   <TableCell className="text-muted">{po.expectedReceiptAt ? new Date(po.expectedReceiptAt).toLocaleDateString() : '—'}</TableCell>
                   <TableCell align="right">
                     <div className="flex justify-end gap-1">

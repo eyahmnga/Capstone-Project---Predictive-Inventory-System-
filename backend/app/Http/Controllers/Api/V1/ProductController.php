@@ -80,6 +80,7 @@ class ProductController extends Controller
                 'barcode' => $validated['barcode'] ?? null,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
+                'image_url' => $validated['imageUrl'] ?? null,
                 'product_type' => $validated['productType'],
                 'is_active' => $validated['isActive'] ?? true,
                 'is_lot_tracked' => $validated['isLotTracked'] ?? false,
@@ -121,6 +122,7 @@ class ProductController extends Controller
             'barcode' => 'barcode',
             'name' => 'name',
             'description' => 'description',
+            'imageUrl' => 'image_url',
             'productType' => 'product_type',
             'isActive' => 'is_active',
             'isLotTracked' => 'is_lot_tracked',
@@ -145,6 +147,28 @@ class ProductController extends Controller
         }
 
         return new ProductResource($updated->load(['category', 'stockUnit']));
+    }
+
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $this->authorize('create', Product::class);
+
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp,svg', 'max:5120'],
+        ]);
+
+        $file = $request->file('image');
+        $filename = (string) Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $path = $file->storeAs('products', $filename, 'public');
+
+        $url = asset('storage/' . $path);
+
+        return response()->json([
+            'data' => [
+                'url' => $url,
+                'path' => $path,
+            ],
+        ]);
     }
 
     public function destroy(Request $request, Product $product): JsonResponse

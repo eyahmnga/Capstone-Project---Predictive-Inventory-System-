@@ -109,6 +109,34 @@ class SaleTest extends TestCase
         $this->assertSame('15.0000', $balance->on_hand_quantity);
     }
 
+    public function test_finalize_sale_with_tax_exempt_calculates_zero_tax(): void
+    {
+        $staff = $this->userWithRole('staff');
+        $this->actAs($staff);
+
+        $payload = [
+            'branchId' => $this->branch->id,
+            'soldAt' => now()->toIso8601String(),
+            'currencyCode' => 'PHP',
+            'taxExempt' => true,
+            'lines' => [[
+                'productId' => $this->product->id,
+                'productUnitId' => $this->unit->id,
+                'quantity' => 5,
+            ]],
+            'payments' => [[
+                'paymentMethod' => 'cash',
+                'amount' => 500.0,
+            ]],
+        ];
+
+        $response = $this->postJson('/api/v1/sales', $payload, ['Idempotency-Key' => 'sale-tax-exempt-1']);
+        $response->assertCreated();
+        $response->assertJsonPath('data.status', 'completed');
+        $response->assertJsonPath('data.taxAmount', '0.0000');
+        $response->assertJsonPath('data.totalAmount', '500.0000');
+    }
+
     public function test_finalize_sale_is_idempotent_and_does_not_double_apply(): void
     {
         $staff = $this->userWithRole('staff');

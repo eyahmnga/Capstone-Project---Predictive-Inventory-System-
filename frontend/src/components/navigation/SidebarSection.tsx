@@ -21,7 +21,7 @@ export function SidebarSection({
       {isSidebarExpanded ? (
         <h2
           id={`sidebar-section-${section.key}`}
-          className="px-3 text-[0.68rem] font-semibold uppercase tracking-normal text-white/35"
+          className="px-3 text-[0.68rem] font-bold uppercase tracking-wider text-white/40"
         >
           {section.label}
         </h2>

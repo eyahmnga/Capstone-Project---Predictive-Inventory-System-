@@ -45,6 +45,14 @@ describe('computeLineTotals', () => {
     const totals = computeLineTotals(makeLine({ discountAmount: '999' }))
     expect(totals.netAmount).toBe(0)
   })
+
+  it('computes 0 tax when isTaxIncluded is false', () => {
+    const totals = computeLineTotals(makeLine(), false)
+    expect(totals.grossAmount).toBe(200)
+    expect(totals.netAmount).toBe(200)
+    expect(totals.taxAmount).toBe(0)
+    expect(totals.totalAmount).toBe(200)
+  })
 })
 
 describe('computeCartTotals', () => {
@@ -53,6 +61,13 @@ describe('computeCartTotals', () => {
     expect(totals.subtotal).toBe(250)
     expect(totals.tax).toBeCloseTo(30)
     expect(totals.total).toBeCloseTo(280)
+  })
+
+  it('computes cart totals with tax exemption when isTaxIncluded is false', () => {
+    const totals = computeCartTotals([makeLine(), makeLine({ productId: '2', quantity: 1, catalogUnitPrice: '50.0000' })], false)
+    expect(totals.subtotal).toBe(250)
+    expect(totals.tax).toBe(0)
+    expect(totals.total).toBe(250)
   })
 
   it('returns zeroed totals for an empty cart', () => {
