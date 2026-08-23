@@ -18,6 +18,7 @@ import { AdjustmentTable } from '@/features/inventory/components/AdjustmentTable
 import { InventoryBalanceTable } from '@/features/inventory/components/InventoryBalanceTable'
 import { InventoryMovementTable } from '@/features/inventory/components/InventoryMovementTable'
 import { useInventoryAdjustments, useInventoryBalances, useInventoryMovements } from '@/features/inventory/hooks/useInventory'
+import { useReorderPolicies } from '@/features/restocking/hooks/useRestocking'
 import type {
   AdjustmentFormValues,
   AdjustmentStatus,
@@ -90,6 +91,7 @@ export default function InventoryPage() {
   }, [defaultBranchId])
 
   const balancesQuery = useInventoryBalances(balanceFilters)
+  const policiesQuery = useReorderPolicies({ branchId: defaultBranchId ?? null, page: 1, perPage: 100 })
   const movementsQuery = useInventoryMovements(movementFilters)
   const adjustmentsQuery = useInventoryAdjustments(adjustmentFilters)
   const productOptionsQuery = useProductOptions()
@@ -228,8 +230,10 @@ export default function InventoryPage() {
               <option value="out_of_stock">Out of stock</option>
             </select>
           </section>
-          <p className="text-sm text-muted">{balancesQuery.data?.meta.total ?? 0} balances {balancesQuery.isFetching ? '· Updating…' : ''}</p>
-          <InventoryBalanceTable balances={balancesQuery.data?.data ?? []} />
+          <InventoryBalanceTable
+            balances={balancesQuery.data?.data ?? []}
+            policies={policiesQuery.data?.data ?? []}
+          />
         </div>
       ) : null}
 

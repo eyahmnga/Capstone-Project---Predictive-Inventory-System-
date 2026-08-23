@@ -65,6 +65,16 @@ class Product extends Model
         return $this->belongsTo(UnitOfMeasure::class, 'stock_unit_id');
     }
 
+    public function inventoryBalances(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Domains\Inventory\Models\InventoryBalance::class);
+    }
+
+    public function reorderPolicies(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Domains\Planning\Models\ReorderPolicy::class);
+    }
+
     protected static function newFactory(): ProductFactory
     {
         return ProductFactory::new();

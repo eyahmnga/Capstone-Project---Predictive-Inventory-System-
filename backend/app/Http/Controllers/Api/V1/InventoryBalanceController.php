@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domains\Catalog\Models\Product;
 use App\Domains\Inventory\Models\InventoryBalance;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\InventoryBalanceResource;
@@ -29,10 +30,32 @@ class InventoryBalanceController extends Controller
             throw new AuthorizationException;
         }
 
-        $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
+        // Ensure all active stock products exist in inventory balances for this branch
+        $missingProductIds = Product::query()
+            ->where('is_active', true)
+            ->where('product_type', 'stock')
+            ->whereDoesntHave('inventoryBalances', fn ($q) => $q->where('branch_id', $branchId))
+            ->pluck('id');
+
+        if ($missingProductIds->isNotEmpty()) {
+            foreach ($missingProductIds as $pid) {
+                InventoryBalance::query()->firstOrCreate(
+                    ['branch_id' => $branchId, 'product_id' => $pid],
+                    [
+                        'on_hand_quantity' => '0.0000',
+                        'reserved_quantity' => '0.0000',
+                        'available_quantity' => '0.0000',
+                        'incoming_quantity' => '0.0000',
+                        'row_version' => 1,
+                    ]
+                );
+            }
+        }
+
+        $perPage = min(max((int) $request->integer('perPage', 50), 1), 100);
         $page = max((int) $request->integer('page', 1), 1);
 
-        $query = InventoryBalance::query()->with('product')->where('branch_id', $branchId);
+        $query = InventoryBalance::query()->with('product.category', 'product.stockUnit')->where('branch_id', $branchId);
 
         if ($request->filled('productId')) {
             $query->where('product_id', (int) $request->query('productId'));
