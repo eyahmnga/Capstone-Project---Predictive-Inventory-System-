@@ -7,6 +7,8 @@ import { cn } from '@/shared/lib/cn'
 import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, sheetHeaderClass } from '@/shared/lib/modalClasses'
 import { Portal } from '@/shared/components/Portal'
 
+import { cleanNumericInput } from '@/shared/lib/formatters'
+
 type ProductFormDialogProps = {
   product?: Product
   initialCategoryId?: string
@@ -103,7 +105,11 @@ export function ProductFormDialog({ product, initialCategoryId, categoryOptions,
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    onSave(values)
+    onSave({
+      ...values,
+      sellingPrice: cleanNumericInput(values.sellingPrice) || '0.00',
+      defaultTaxRate: cleanNumericInput(values.defaultTaxRate) || '12.00',
+    })
   }
 
   const isValid = values.categoryId !== '' && values.stockUnitId !== ''
@@ -287,12 +293,12 @@ export function ProductFormDialog({ product, initialCategoryId, categoryOptions,
                 Selling price (₱)
                 <input
                   className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-                  min="0"
+                  inputMode="decimal"
+                  placeholder="0.00"
                   required
-                  step="0.01"
-                  type="number"
+                  type="text"
                   value={values.sellingPrice}
-                  onChange={(event) => setValues((state) => ({ ...state, sellingPrice: event.target.value }))}
+                  onChange={(event) => setValues((state) => ({ ...state, sellingPrice: event.target.value.replace(/[^0-9.,]/g, '') }))}
                 />
               </label>
 
@@ -300,12 +306,12 @@ export function ProductFormDialog({ product, initialCategoryId, categoryOptions,
                 Tax rate (%)
                 <input
                   className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-                  min="0"
+                  inputMode="decimal"
+                  placeholder="12.00"
                   required
-                  step="0.01"
-                  type="number"
+                  type="text"
                   value={values.defaultTaxRate}
-                  onChange={(event) => setValues((state) => ({ ...state, defaultTaxRate: event.target.value }))}
+                  onChange={(event) => setValues((state) => ({ ...state, defaultTaxRate: event.target.value.replace(/[^0-9.,]/g, '') }))}
                 />
               </label>
 

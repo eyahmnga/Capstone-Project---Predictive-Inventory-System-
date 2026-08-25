@@ -100,13 +100,13 @@ export function GoodsReceiptFormDialog({ receivablePurchaseOrders, isSaving, onC
                       <p className="mt-0.5 text-xs text-muted">Remaining ordered: {line.remainingQuantity}</p>
                       <div className="mt-2 grid grid-cols-3 gap-2">
                         <label className="text-xs font-semibold text-muted">Received
-                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="0.0001" type="number" value={line.receivedQuantity} onChange={(event) => updateLine(index, { receivedQuantity: event.target.value })} />
+                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="any" type="number" value={line.receivedQuantity} onChange={(event) => updateLine(index, { receivedQuantity: event.target.value })} />
                         </label>
                         <label className="text-xs font-semibold text-muted">Accepted
-                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="0.0001" type="number" value={line.acceptedQuantity} onChange={(event) => updateLine(index, { acceptedQuantity: event.target.value })} />
+                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="any" type="number" value={line.acceptedQuantity} onChange={(event) => updateLine(index, { acceptedQuantity: event.target.value })} />
                         </label>
                         <label className="text-xs font-semibold text-muted">Rejected
-                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="0.0001" type="number" value={line.rejectedQuantity} onChange={(event) => updateLine(index, { rejectedQuantity: event.target.value })} />
+                          <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="any" type="number" value={line.rejectedQuantity} onChange={(event) => updateLine(index, { rejectedQuantity: event.target.value })} />
                         </label>
                       </div>
                       {Number(line.rejectedQuantity) > 0 ? (

@@ -98,10 +98,10 @@ export function UserFormDialog({ user, roleOptions, branchOptions, isSaving, onC
     onSave(values)
   }
 
-  const toggleRole = (roleId: string) => {
+  const selectRole = (roleId: string) => {
     setValues((state) => ({
       ...state,
-      roleIds: state.roleIds.includes(roleId) ? state.roleIds.filter((id) => id !== roleId) : [...state.roleIds, roleId],
+      roleIds: [roleId],
     }))
   }
 
@@ -264,19 +264,30 @@ export function UserFormDialog({ user, roleOptions, branchOptions, isSaving, onC
 
               {/* Roles */}
               <fieldset>
-                <legend className="text-sm font-semibold text-ink">Roles</legend>
+                <legend className="text-sm font-semibold text-ink">Role</legend>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {roleOptions.map((role) => (
-                    <label key={role.id} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-ink cursor-pointer select-none">
-                      <input
-                        checked={values.roleIds.includes(role.id)}
-                        className="h-4 w-4 rounded border-border text-brand-600 focus:ring-brand-600/20 cursor-pointer"
-                        type="checkbox"
-                        onChange={() => toggleRole(role.id)}
-                      />
-                      {role.name}
-                    </label>
-                  ))}
+                  {roleOptions.map((role) => {
+                    const isSelected = values.roleIds.includes(role.id)
+                    return (
+                      <label
+                        key={role.id}
+                        className={cn(
+                          'inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-ink cursor-pointer select-none transition-colors hover:bg-slate-50',
+                          isSelected && 'border-brand-600 bg-brand-50/50 font-medium text-brand-900',
+                        )}
+                      >
+                        <input
+                          checked={isSelected}
+                          className="h-4 w-4 border-border text-brand-600 focus:ring-brand-600/20 cursor-pointer"
+                          name="role"
+                          type="radio"
+                          value={role.id}
+                          onChange={() => selectRole(role.id)}
+                        />
+                        {role.name}
+                      </label>
+                    )
+                  })}
                 </div>
               </fieldset>
 

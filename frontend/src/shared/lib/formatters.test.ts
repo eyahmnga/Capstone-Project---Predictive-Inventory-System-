@@ -1,5 +1,5 @@
-﻿import { describe, expect, it } from 'vitest'
-import { formatCurrency, formatPercent, formatQuantity } from './formatters'
+import { describe, expect, it } from 'vitest'
+import { cleanNumericInput, formatCurrency, formatPercent, formatQuantity } from './formatters'
 
 describe('formatQuantity', () => {
   it('formats numeric string with 4 decimals to 2 decimals', () => {
@@ -32,5 +32,16 @@ describe('formatPercent', () => {
   it('formats percentage to 2 decimals with % suffix', () => {
     expect(formatPercent('12.0000')).toBe('12.00%')
     expect(formatPercent(5.5)).toBe('5.50%')
+  })
+})
+
+describe('cleanNumericInput', () => {
+  it('strips commas and trims whitespace', () => {
+    expect(cleanNumericInput('1,500.00')).toBe('1500.00')
+    expect(cleanNumericInput(' 25,000 ')).toBe('25000')
+    expect(cleanNumericInput('1,234,567.89')).toBe('1234567.89')
+    expect(cleanNumericInput(null)).toBe('')
+    expect(cleanNumericInput(undefined)).toBe('')
+    expect(cleanNumericInput(1500)).toBe('1500')
   })
 })

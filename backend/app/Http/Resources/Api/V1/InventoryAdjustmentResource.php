@@ -27,6 +27,14 @@ class InventoryAdjustmentResource extends JsonResource
             'approvedAt' => optional($adjustment->approved_at)->toIso8601String(),
             'postedAt' => optional($adjustment->posted_at)->toIso8601String(),
             'reversalAdjustmentId' => $adjustment->reversal_adjustment_id ? (string) $adjustment->reversal_adjustment_id : null,
+            'createdBy' => $adjustment->creator ? [
+                'id' => (string) $adjustment->creator->id,
+                'displayName' => $adjustment->creator->display_name,
+            ] : null,
+            'approvedBy' => $adjustment->approver ? [
+                'id' => (string) $adjustment->approver->id,
+                'displayName' => $adjustment->approver->display_name,
+            ] : null,
             'lineCount' => $adjustment->lines_count ?? ($adjustment->relationLoaded('lines') ? $adjustment->lines->count() : null),
             'lines' => $adjustment->relationLoaded('lines') ? $adjustment->lines->map(fn ($line) => [
                 'id' => (string) $line->id,

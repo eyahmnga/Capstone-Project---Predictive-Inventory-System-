@@ -50,7 +50,7 @@ export function ReorderPolicyFormDialog({ productOptions, isSaving, onClose, onS
             </select>
           </label>
           <label className="text-sm font-semibold text-ink">Safety stock quantity
-            <input className="mt-2 h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" min="0" required step="0.0001" type="number" value={safetyStockQuantity} onChange={(event) => setSafetyStockQuantity(event.target.value)} />
+            <input className="mt-2 h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" min="0" required step="any" type="number" value={safetyStockQuantity} onChange={(event) => setSafetyStockQuantity(event.target.value)} />
           </label>
           <label className="text-sm font-semibold text-ink">Safety stock basis
             <select className="mt-2 h-10 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={safetyStockBasis} onChange={(event) => setSafetyStockBasis(event.target.value as SafetyStockBasis)}>

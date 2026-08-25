@@ -74,6 +74,8 @@ export type InventoryAdjustment = {
   approvedAt: string | null
   postedAt: string | null
   reversalAdjustmentId: string | null
+  createdBy: { id: string; displayName: string } | null
+  approvedBy: { id: string; displayName: string } | null
   lineCount: number | null
   lines: InventoryAdjustmentLine[]
   version: number

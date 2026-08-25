@@ -7,6 +7,7 @@ import { Button } from '@/shared/components/Button'
 import { cn } from '@/shared/lib/cn'
 import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, sheetHeaderClass } from '@/shared/lib/modalClasses'
 import { Portal } from '@/shared/components/Portal'
+import { cleanNumericInput } from '@/shared/lib/formatters'
 
 type ProductOption = { id: string; sku: string; name: string }
 
@@ -26,7 +27,19 @@ export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitO
     supplierId: '', currencyCode: 'PHP', expectedReceiptAt: '', supplierReference: '', notes: '', lines: [{ ...emptyLine }],
   })
 
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave(values) }
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave({
+      ...values,
+      lines: values.lines.map((line) => ({
+        ...line,
+        orderedQuantity: cleanNumericInput(line.orderedQuantity),
+        unitCost: cleanNumericInput(line.unitCost),
+        taxRate: cleanNumericInput(line.taxRate) || '12',
+        discountAmount: cleanNumericInput(line.discountAmount) || '0',
+      })),
+    })
+  }
 
   const updateLine = (index: number, patch: Partial<PurchaseOrderLineInput>) => {
     setValues((state) => ({ ...state, lines: state.lines.map((line, i) => (i === index ? { ...line, ...patch } : line)) }))
@@ -80,16 +93,16 @@ export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitO
                       </select>
                     </label>
                     <label className="text-xs font-semibold text-muted">Qty
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="0.0001" type="number" value={line.orderedQuantity} onChange={(event) => updateLine(index, { orderedQuantity: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="0" required type="text" value={line.orderedQuantity} onChange={(event) => updateLine(index, { orderedQuantity: event.target.value.replace(/[^0-9.,]/g, '') })} />
                     </label>
                     <label className="text-xs font-semibold text-muted">Unit cost
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" required step="0.0001" type="number" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="0.00" required type="text" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value.replace(/[^0-9.,]/g, '') })} />
                     </label>
                     <label className="text-xs font-semibold text-muted">Tax %
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" step="0.0001" type="number" value={line.taxRate} onChange={(event) => updateLine(index, { taxRate: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="12" type="text" value={line.taxRate} onChange={(event) => updateLine(index, { taxRate: event.target.value.replace(/[^0-9.,]/g, '') })} />
                     </label>
                     <label className="text-xs font-semibold text-muted">Discount
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" step="0.0001" type="number" value={line.discountAmount} onChange={(event) => updateLine(index, { discountAmount: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="0.00" type="text" value={line.discountAmount} onChange={(event) => updateLine(index, { discountAmount: event.target.value.replace(/[^0-9.,]/g, '') })} />
                     </label>
                     <Button aria-label="Remove line" className="self-end sm:mb-0.5" disabled={values.lines.length === 1} size="icon" type="button" variant="ghost" onClick={() => removeLine(index)}><Trash2 aria-hidden="true" size={16} /></Button>
                   </div>

@@ -154,12 +154,11 @@ export function PaymentsPanel({
                   <input
                     aria-label={`Payment amount ${index + 1}`}
                     className="h-8 w-24 rounded-md border border-border bg-surface pl-5 pr-1.5 text-right text-xs font-bold text-ink outline-none focus:border-brand-600"
-                    min="0"
+                    inputMode="decimal"
                     placeholder="0.00"
-                    step="0.01"
-                    type="number"
+                    type="text"
                     value={payment.amount}
-                    onChange={(event) => onUpdate(payment.localId, { amount: event.target.value })}
+                    onChange={(event) => onUpdate(payment.localId, { amount: event.target.value.replace(/[^0-9.,]/g, '') })}
                   />
                 </div>
 

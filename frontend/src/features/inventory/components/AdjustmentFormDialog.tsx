@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/Button'
 import { cn } from '@/shared/lib/cn'
 import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, sheetHeaderClass } from '@/shared/lib/modalClasses'
 import { Portal } from '@/shared/components/Portal'
+import { cleanNumericInput } from '@/shared/lib/formatters'
 
 type ProductOption = { id: string; sku: string; name: string }
 
@@ -30,7 +31,18 @@ export function AdjustmentFormDialog({ productOptions, isSaving, onClose, onSave
     reasonCode: 'count_correction', reasonNote: '', effectiveAt: new Date().toISOString().slice(0, 10), lines: [{ ...emptyLine }],
   })
 
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave({ ...values, effectiveAt: new Date(values.effectiveAt).toISOString() }) }
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave({
+      ...values,
+      effectiveAt: new Date(values.effectiveAt).toISOString(),
+      lines: values.lines.map((line) => ({
+        ...line,
+        quantityDelta: cleanNumericInput(line.quantityDelta),
+        unitCost: cleanNumericInput(line.unitCost),
+      })),
+    })
+  }
 
   const updateLine = (index: number, patch: Partial<AdjustmentLineInput>) => {
     setValues((state) => ({ ...state, lines: state.lines.map((line, i) => (i === index ? { ...line, ...patch } : line)) }))
@@ -39,7 +51,7 @@ export function AdjustmentFormDialog({ productOptions, isSaving, onClose, onSave
   const addLine = () => setValues((state) => ({ ...state, lines: [...state.lines, { ...emptyLine }] }))
   const removeLine = (index: number) => setValues((state) => ({ ...state, lines: state.lines.filter((_, i) => i !== index) }))
 
-  const isValid = values.lines.length > 0 && values.lines.every((line) => line.productId && line.quantityDelta && Number(line.quantityDelta) !== 0)
+  const isValid = values.lines.length > 0 && values.lines.every((line) => line.productId && line.quantityDelta && Number(cleanNumericInput(line.quantityDelta)) !== 0)
 
   return (
     <Portal>
@@ -57,36 +69,41 @@ export function AdjustmentFormDialog({ productOptions, isSaving, onClose, onSave
               <label className="text-sm font-semibold text-ink">Effective date<input className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" required type="date" value={values.effectiveAt} onChange={(event) => setValues((state) => ({ ...state, effectiveAt: event.target.value }))} /></label>
             </div>
 
-            <label className="block text-sm font-semibold text-ink">Notes<textarea className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" rows={2} value={values.reasonNote} onChange={(event) => setValues((state) => ({ ...state, reasonNote: event.target.value }))} /></label>
-
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink">Lines</h3>
-                <Button size="icon" type="button" variant="ghost" onClick={addLine}><Plus aria-hidden="true" size={16} /><span className="sr-only">Add line</span></Button>
+                <h3 className="text-sm font-semibold text-ink">Items to adjust</h3>
+                <Button size="sm" type="button" variant="secondary" onClick={addLine}><Plus aria-hidden="true" size={15} /> Add item</Button>
               </div>
-              <div className="mt-2 space-y-3">
+              <div className="mt-2.5 space-y-2.5">
                 {values.lines.map((line, index) => (
-                  <div className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:grid sm:grid-cols-[minmax(0,1.5fr)_110px_110px_minmax(0,1fr)_36px] sm:items-end" key={index}>
+                  <div className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:grid sm:grid-cols-[minmax(0,2fr)_140px_130px_36px] sm:items-end bg-surface" key={index}>
                     <label className="text-xs font-semibold text-muted">Product
-                      <select className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" required value={line.productId} onChange={(event) => updateLine(index, { productId: event.target.value })}>
-                        <option value="" disabled>Select</option>
+                      <select className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none focus:border-brand-600" required value={line.productId} onChange={(event) => updateLine(index, { productId: event.target.value })}>
+                        <option value="" disabled>Select a product</option>
                         {productOptions.map((option) => <option key={option.id} value={option.id}>{option.sku} — {option.name}</option>)}
                       </select>
                     </label>
-                    <label className="text-xs font-semibold text-muted">Delta
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" placeholder="±0.00" required step="0.01" type="number" value={line.quantityDelta} onChange={(event) => updateLine(index, { quantityDelta: event.target.value })} />
+                    <label className="text-xs font-semibold text-muted">Qty change (+/-)
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="+5 or -2" required type="text" value={line.quantityDelta} onChange={(event) => updateLine(index, { quantityDelta: event.target.value.replace(/[^0-9.,+-]/g, '') })} />
                     </label>
                     <label className="text-xs font-semibold text-muted">Unit cost (₱)
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" min="0" placeholder="0.00" step="0.01" type="number" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value })} />
+                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none focus:border-brand-600" inputMode="decimal" placeholder="0.00" type="text" value={line.unitCost} onChange={(event) => updateLine(index, { unitCost: event.target.value.replace(/[^0-9.,]/g, '') })} />
                     </label>
-                    <label className="text-xs font-semibold text-muted">Line note
-                      <input className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" value={line.notes} onChange={(event) => updateLine(index, { notes: event.target.value })} />
-                    </label>
-                    <Button aria-label="Remove line" className="self-end sm:mb-0.5" disabled={values.lines.length === 1} size="icon" type="button" variant="ghost" onClick={() => removeLine(index)}><Trash2 aria-hidden="true" size={16} /></Button>
+                    <Button aria-label="Remove item" className="self-end sm:mb-0.5 text-muted hover:text-danger-text" disabled={values.lines.length === 1} size="icon" type="button" variant="ghost" onClick={() => removeLine(index)}><Trash2 aria-hidden="true" size={16} /></Button>
                   </div>
                 ))}
               </div>
             </div>
+
+            <label className="block text-sm font-semibold text-ink">
+              Notes <span className="text-xs font-normal text-muted">(Optional)</span>
+              <input
+                className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+                placeholder="e.g. End of month physical inventory count"
+                value={values.reasonNote}
+                onChange={(event) => setValues((state) => ({ ...state, reasonNote: event.target.value }))}
+              />
+            </label>
           </div>
 
           <div className={sheetFooterClass}>

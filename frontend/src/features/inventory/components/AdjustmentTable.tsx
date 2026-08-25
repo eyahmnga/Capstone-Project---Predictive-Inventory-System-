@@ -21,7 +21,8 @@ export function AdjustmentTable({ adjustments, onView }: { adjustments: Inventor
               subtitle={<span className="capitalize">{adjustment.reasonCode.replace('_', ' ')}</span>}
               fields={[
                 { label: 'Effective', value: adjustment.effectiveAt ? new Date(adjustment.effectiveAt).toLocaleDateString() : '—' },
-                { label: 'Lines', value: adjustment.lineCount ?? '—' },
+                { label: 'Adjusted by', value: adjustment.createdBy?.displayName ?? '—' },
+                { label: 'Items', value: adjustment.lineCount ?? '—' },
               ]}
               onClick={() => onView(adjustment)}
             />
@@ -30,20 +31,21 @@ export function AdjustmentTable({ adjustments, onView }: { adjustments: Inventor
       </div>
 
       <div className="hidden md:block">
-        <Table minWidth={750}>
+        <Table minWidth={850}>
           <TableHead>
             <tr>
               <TableHeaderCell>Adjustment number</TableHeaderCell>
               <TableHeaderCell>Reason</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell>Effective</TableHeaderCell>
-              <TableHeaderCell align="right">Lines</TableHeaderCell>
+              <TableHeaderCell>Adjusted by</TableHeaderCell>
+              <TableHeaderCell align="right">Items</TableHeaderCell>
               <TableHeaderCell align="right">Actions</TableHeaderCell>
             </tr>
           </TableHead>
           <TableBody>
             {adjustments.length === 0 ? (
-              <TableEmptyState colSpan={6}>No adjustments match these filters.</TableEmptyState>
+              <TableEmptyState colSpan={7}>No adjustments match these filters.</TableEmptyState>
             ) : (
               adjustments.map((adjustment) => (
                 <TableRow key={adjustment.id}>
@@ -51,6 +53,7 @@ export function AdjustmentTable({ adjustments, onView }: { adjustments: Inventor
                   <TableCell className="capitalize text-muted">{adjustment.reasonCode.replace('_', ' ')}</TableCell>
                   <TableCell><AdjustmentStatusBadge isApproved={adjustment.approvedAt !== null} status={adjustment.status} /></TableCell>
                   <TableCell className="text-muted">{adjustment.effectiveAt ? new Date(adjustment.effectiveAt).toLocaleDateString() : '—'}</TableCell>
+                  <TableCell className="text-ink font-medium">{adjustment.createdBy?.displayName ?? '—'}</TableCell>
                   <TableCell align="right" className="text-ink">{adjustment.lineCount ?? '—'}</TableCell>
                   <TableCell align="right">
                     <div className="flex justify-end gap-1">

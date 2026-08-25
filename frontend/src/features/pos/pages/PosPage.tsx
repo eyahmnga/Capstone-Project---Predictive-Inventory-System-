@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { getPosProducts } from '@/features/pos/api/posApi'
 import { useFinalizeSale } from '@/features/pos/hooks/usePos'
 import { playScanBeep, useBarcodeScanner } from '@/features/pos/hooks/useBarcodeScanner'
-import { computeCartTotals } from '@/features/pos/lib/cartTotals'
+import { computeCartTotals, lineRequiresOverrideReason } from '@/features/pos/lib/cartTotals'
 import { usePosCartStore } from '@/features/pos/state/posCartStore'
 import { CartTable } from '@/features/pos/components/CartTable'
 import { CheckoutSummary } from '@/features/pos/components/CheckoutSummary'
@@ -12,9 +12,9 @@ import { HeldOrdersDialog } from '@/features/pos/components/HeldOrdersDialog'
 import { PaymentsPanel } from '@/features/pos/components/PaymentsPanel'
 import { ProductSearchPanel } from '@/features/pos/components/ProductSearchPanel'
 import { ReceiptDialog } from '@/features/pos/components/ReceiptDialog'
-import { lineRequiresOverrideReason } from '@/features/pos/lib/cartTotals'
 import type { Sale } from '@/features/sales/types/sale'
 import { type ApiError } from '@/shared/api/client'
+import { cleanNumericInput } from '@/shared/lib/formatters'
 
 export default function PosPage() {
   const { session, hasPermission } = useAuth()
@@ -70,7 +70,7 @@ export default function PosPage() {
   const canOverrideDiscount = hasPermission('pos.discount_override')
 
   const totals = computeCartTotals(cart.lines, cart.isTaxIncluded)
-  const paymentsTotal = cart.payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+  const paymentsTotal = cart.payments.reduce((sum, payment) => sum + (Number(cleanNumericInput(payment.amount)) || 0), 0)
   const hasOverStockLine = cart.lines.some((line) => line.availableQuantity !== null && line.quantity > Number(line.availableQuantity))
   const missingOverrideReason = cart.lines.some((line) => lineRequiresOverrideReason(line) && line.overrideReason.trim() === '')
   const isFullyPaid = cart.payments.length > 0 && paymentsTotal >= totals.total - 0.01
@@ -92,14 +92,17 @@ export default function PosPage() {
 
     // If single payment tendered is higher than total (e.g. Cash ₱1000 for ₱450 sale), settle payment record to sale total
     const isSinglePayment = cart.payments.length === 1
-    const paymentsPayload = cart.payments.map((payment) => ({
-      paymentMethod: payment.paymentMethod,
-      amount:
-        isSinglePayment && Number(payment.amount) > totals.total
-          ? totals.total.toFixed(2)
-          : payment.amount,
-      externalReference: payment.externalReference || undefined,
-    }))
+    const paymentsPayload = cart.payments.map((payment) => {
+      const cleanAmount = cleanNumericInput(payment.amount)
+      return {
+        paymentMethod: payment.paymentMethod,
+        amount:
+          isSinglePayment && Number(cleanAmount) > totals.total
+            ? totals.total.toFixed(2)
+            : cleanAmount,
+        externalReference: payment.externalReference || undefined,
+      }
+    })
 
     const combinedNotes =
       [

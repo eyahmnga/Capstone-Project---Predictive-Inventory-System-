@@ -37,8 +37,33 @@ export function AdjustmentDetailsDrawer({ adjustment, isActing, onClose, onAppro
           <Button aria-label="Close adjustment details" size="icon" variant="ghost" onClick={onClose}><X aria-hidden="true" size={18} /></Button>
         </header>
         <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-subtle/50 p-3.5 text-xs">
+            <div>
+              <span className="text-muted">Adjusted by</span>
+              <p className="mt-0.5 font-semibold text-ink">{adjustment.createdBy?.displayName ?? '—'}</p>
+            </div>
+            <div>
+              <span className="text-muted">Effective date</span>
+              <p className="mt-0.5 font-semibold text-ink">
+                {adjustment.effectiveAt ? new Date(adjustment.effectiveAt).toLocaleDateString() : '—'}
+              </p>
+            </div>
+            {adjustment.approvedBy && (
+              <div>
+                <span className="text-muted">Approved by</span>
+                <p className="mt-0.5 font-semibold text-ink">{adjustment.approvedBy.displayName}</p>
+              </div>
+            )}
+            {adjustment.postedAt && (
+              <div>
+                <span className="text-muted">Posted at</span>
+                <p className="mt-0.5 font-semibold text-ink">{new Date(adjustment.postedAt).toLocaleDateString()}</p>
+              </div>
+            )}
+          </div>
+
           <section>
-            <h3 className="text-sm font-semibold text-ink">Lines</h3>
+            <h3 className="text-sm font-semibold text-ink">Adjusted items</h3>
             <div className="mt-3 space-y-2 sm:hidden">
               {adjustment.lines.map((line) => (
                 <div className="rounded-xl border border-border p-3 text-sm" key={line.id}>
@@ -46,7 +71,7 @@ export function AdjustmentDetailsDrawer({ adjustment, isActing, onClose, onAppro
                   <p className="text-xs text-muted">{line.productSku}</p>
                   <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
                     <div><dt className="text-muted">Before</dt><dd className="tabular-nums text-ink">{formatQuantity(line.beforeQuantity)}</dd></div>
-                    <div><dt className="text-muted">Delta</dt><dd className={`tabular-nums font-semibold ${Number(line.quantityDelta) > 0 ? 'text-success-text' : 'text-danger-text'}`}>{Number(line.quantityDelta) > 0 ? '+' : ''}{formatQuantity(line.quantityDelta)}</dd></div>
+                    <div><dt className="text-muted">Change</dt><dd className={`tabular-nums font-semibold ${Number(line.quantityDelta) > 0 ? 'text-success-text' : 'text-danger-text'}`}>{Number(line.quantityDelta) > 0 ? '+' : ''}{formatQuantity(line.quantityDelta)}</dd></div>
                     <div><dt className="text-muted">After</dt><dd className="tabular-nums text-ink">{formatQuantity(line.afterQuantity)}</dd></div>
                   </dl>
                 </div>
@@ -54,7 +79,7 @@ export function AdjustmentDetailsDrawer({ adjustment, isActing, onClose, onAppro
             </div>
             <div className="mt-3 hidden overflow-x-auto rounded-xl border border-border sm:block">
               <table className="w-full min-w-[550px] text-sm">
-                <thead className="bg-subtle text-left text-xs font-semibold text-muted"><tr><th className="px-3 py-2">Product</th><th className="px-3 py-2 text-right">Before</th><th className="px-3 py-2 text-right">Delta</th><th className="px-3 py-2 text-right">After</th></tr></thead>
+                <thead className="bg-subtle text-left text-xs font-semibold text-muted"><tr><th className="px-3 py-2">Product</th><th className="px-3 py-2 text-right">Before</th><th className="px-3 py-2 text-right">Change</th><th className="px-3 py-2 text-right">After</th></tr></thead>
                 <tbody className="divide-y divide-border">
                   {adjustment.lines.map((line) => (
                     <tr key={line.id}>
