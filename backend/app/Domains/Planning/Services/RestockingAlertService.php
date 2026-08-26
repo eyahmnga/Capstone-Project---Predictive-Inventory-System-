@@ -33,7 +33,8 @@ class RestockingAlertService
 {
     public function evaluatePolicy(ReorderPolicy $policy): ?RestockingAlert
     {
-        if ($policy->reorder_point_quantity === null || ! $policy->is_active) {
+        $threshold = $policy->reorder_point_quantity ?? $policy->safety_stock_quantity;
+        if ($threshold === null || ! $policy->is_active) {
             return null;
         }
 
@@ -44,7 +45,7 @@ class RestockingAlertService
 
         $available = $balance?->available_quantity ?? '0.0000';
         $incoming = $balance?->incoming_quantity ?? '0.0000';
-        $rop = (string) $policy->reorder_point_quantity;
+        $rop = (string) $threshold;
 
         $existing = RestockingAlert::query()
             ->where('reorder_policy_id', $policy->id)

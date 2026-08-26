@@ -23,24 +23,27 @@ export function classifyProductStock(
     return 'out_of_stock'
   }
 
-  // 2. Low Stock: active alert OR available <= reorder point (when > 0)
+  // 2. Low Stock: active alert OR available <= effective threshold (ROP or Safety Stock)
   const alert = alerts.find((a) => a.productId === product.id || a.productSku === product.sku)
   const policy = policies.find((p) => p.productId === product.id)
-  const rop = Number(policy?.reorderPointQuantity) || 0
+  const threshold =
+    (policy?.reorderPointQuantity ? Number(policy.reorderPointQuantity) : null) ??
+    (policy?.safetyStockQuantity ? Number(policy.safetyStockQuantity) : null) ??
+    0
 
-  if ((alert && alert.severity !== 'critical') || (rop > 0 && available <= rop)) {
+  if ((alert && alert.severity !== 'critical') || (threshold > 0 && available <= threshold)) {
     return 'low_stock'
   }
 
-  // 3. Overstock: inventory on hand exceeds calculated EOQ batch and ROP
+  // 3. Overstock: inventory on hand exceeds calculated EOQ batch and threshold
   const price = Number(product.sellingPrice) || 100
-  const annualDemand = Math.max(12, rop * 12)
+  const annualDemand = Math.max(12, threshold * 12)
   const orderCost = 150
   const holdingCost = Math.max(1, price * 0.15)
   const eoqSuggested = Math.ceil(Math.sqrt((2 * annualDemand * orderCost) / holdingCost)) || 20
   const excess = Math.max(0, onHand - eoqSuggested)
 
-  if (policy && onHand > eoqSuggested && excess > 0 && onHand > rop) {
+  if (policy && onHand > eoqSuggested && excess > 0 && onHand > threshold) {
     return 'overstock'
   }
 
