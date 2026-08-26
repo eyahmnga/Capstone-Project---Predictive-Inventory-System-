@@ -79,6 +79,7 @@ export default function PurchaseOrdersPage() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: purchaseOrderQueryKeys.lists() })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     if (selectedId) void queryClient.invalidateQueries({ queryKey: purchaseOrderQueryKeys.detail(selectedId) })
   }
 

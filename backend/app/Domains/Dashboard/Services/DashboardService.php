@@ -136,13 +136,13 @@ class DashboardService
     {
         $query = PurchaseOrder::query()
             ->where('branch_id', $branchId)
-            ->whereIn('status', ['submitted', 'approved', 'ordered']);
+            ->whereIn('status', ['draft', 'submitted', 'approved', 'ordered']);
 
         $count = $query->count();
 
         $items = (clone $query)
             ->with('supplier')
-            ->orderBy('created_at')
+            ->orderByDesc('created_at')
             ->limit(5)
             ->get()
             ->map(fn (PurchaseOrder $po) => [
