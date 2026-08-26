@@ -7,6 +7,11 @@ use App\Domains\Inventory\Models\InventoryBalance;
 use App\Domains\Sales\Models\Sale;
 use App\Domains\Sales\Services\SaleException;
 use App\Domains\Sales\Services\SaleService;
+use App\Domains\Planning\Models\ReorderPolicy;
+use App\Domains\Planning\Services\EoqService;
+use App\Domains\Planning\Services\RestockingAlertService;
+use App\Domains\Planning\Services\RopService;
+use App\Domains\Planning\Services\SmaForecastService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\FinalizeSaleRequest;
 use App\Http\Requests\Api\V1\RefundSaleRequest;
@@ -15,6 +20,7 @@ use App\Http\Resources\Api\V1\ProductResource;
 use App\Http\Resources\Api\V1\SaleResource;
 use App\Support\Services\IdempotencyConflictException;
 use App\Support\Services\IdempotencyGuard;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,6 +32,10 @@ class SaleController extends Controller
     public function __construct(
         private readonly SaleService $saleService,
         private readonly IdempotencyGuard $idempotencyGuard,
+        private readonly SmaForecastService $smaForecastService,
+        private readonly RopService $ropService,
+        private readonly EoqService $eoqService,
+        private readonly RestockingAlertService $restockingAlertService,
     ) {
     }
 
@@ -217,6 +227,47 @@ class SaleController extends Controller
 
         $responseBody = ['data' => (new SaleResource($sale->load(['lines', 'payments', 'cashier', 'branch'])))->response()->getData(true)['data']];
         $this->idempotencyGuard->complete($request->user(), 'sales.finalize', $idempotencyKey, 201, $responseBody, 'sale', $sale->id);
+
+        // Awtomatikong i-update ang SMA Demand Forecast, ROP, EOQ, at Restock Alerts sa bawat POS transaction
+        try {
+            $today = CarbonImmutable::now()->startOfDay();
+            $historyStart = $today->subDays(13); // 14-day rolling window
+
+            $forecastRun = $this->smaForecastService->createRun([
+                'branch_id' => $sale->branch_id,
+                'model_code' => 'sma',
+                'period_grain' => 'daily',
+                'window_periods' => 14,
+                'history_start_date' => $historyStart->toDateString(),
+                'history_end_date' => $today->toDateString(),
+            ], $request->user(), $correlationId);
+
+            $policies = ReorderPolicy::query()
+                ->where('branch_id', $sale->branch_id)
+                ->where('is_active', true)
+                ->get();
+
+            foreach ($policies as $policy) {
+                try {
+                    $this->ropService->recalculate($policy, $forecastRun->id, $request->user());
+
+                    $dailyRate = $forecastRun->items()->where('product_id', $policy->product_id)->value('forecast_quantity') ?? '0';
+                    $annualDemand = (float) $dailyRate > 0 ? (string) round((float) $dailyRate * 365, 4) : '150';
+                    $this->eoqService->calculate($policy, [
+                        'annual_demand_quantity' => $annualDemand,
+                        'ordering_cost' => '120',
+                        'annual_holding_cost_per_unit' => '15',
+                        'currency_code' => 'PHP',
+                    ], $request->user());
+
+                    $this->restockingAlertService->evaluatePolicy($policy);
+                } catch (\Throwable) {
+                    // Keep individual policy evaluation resilient
+                }
+            }
+        } catch (\Throwable) {
+            // Keep resilient so sale checkout response is never interrupted
+        }
 
         return response()->json($responseBody, 201);
     }

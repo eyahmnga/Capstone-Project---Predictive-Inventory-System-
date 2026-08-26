@@ -20,6 +20,10 @@ export function useFinalizeSale() {
       void queryClient.invalidateQueries({ queryKey: ['products'] })
       void queryClient.invalidateQueries({ queryKey: ['inventory-balances'] })
       void queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+      void queryClient.invalidateQueries({ queryKey: ['forecast-runs'] })
+      void queryClient.invalidateQueries({ queryKey: ['reorder-policies'] })
+      void queryClient.invalidateQueries({ queryKey: ['restocking-alerts'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
