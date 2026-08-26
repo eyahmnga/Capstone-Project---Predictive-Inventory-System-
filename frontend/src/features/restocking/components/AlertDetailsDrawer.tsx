@@ -78,7 +78,7 @@ export function AlertDetailsDrawer({ alert, isActing, onClose, onAcknowledge, on
                       </p>
                     </div>
                     <Link
-                      to="/purchase-orders"
+                      to={`/purchase-orders?newPo=1&productId=${alert.productId}&quantity=${alert.recommendedOrderQuantity ?? ''}`}
                       onClick={onClose}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
                     >

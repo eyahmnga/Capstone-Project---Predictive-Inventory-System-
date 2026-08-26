@@ -163,7 +163,7 @@ export function ReorderPolicyDetailsDrawer({
                     </div>
 
                     <Link
-                      to="/purchase-orders"
+                      to={`/purchase-orders?newPo=1&productId=${policy.productId}&quantity=${latestEoq.recommendedOrderQuantity}&supplierId=${policy.preferredSupplierId ?? ''}`}
                       onClick={onClose}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition shrink-0"
                     >

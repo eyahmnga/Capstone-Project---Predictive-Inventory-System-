@@ -1,5 +1,6 @@
 import { type ChangeEvent, useEffect, useState } from 'react'
 import { FilePlus2, Search } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
@@ -29,9 +30,11 @@ const defaultFilters: PurchaseOrderFilters = { branchId: null, supplierId: 'all'
 
 export default function PurchaseOrdersPage() {
   const { session } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [filters, setFilters] = useState<PurchaseOrderFilters>(defaultFilters)
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [initialFormValues, setInitialFormValues] = useState<Partial<PurchaseOrderFormValues> | undefined>()
   const queryClient = useQueryClient()
 
   const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
@@ -40,6 +43,32 @@ export default function PurchaseOrdersPage() {
       setFilters((state) => ({ ...state, branchId: defaultBranchId }))
     }
   }, [defaultBranchId, filters.branchId])
+
+  // Auto-open modal if navigated from EOQ or Restock Alert
+  useEffect(() => {
+    const isNewPo = searchParams.get('newPo') === '1'
+    const productId = searchParams.get('productId')
+    const quantity = searchParams.get('quantity')
+    const supplierId = searchParams.get('supplierId')
+
+    if (isNewPo || productId) {
+      setInitialFormValues({
+        supplierId: supplierId || '',
+        currencyCode: 'PHP',
+        lines: [
+          {
+            productId: productId || '',
+            unitId: '',
+            orderedQuantity: quantity || '',
+            unitCost: '100',
+            taxRate: '12',
+            discountAmount: '0',
+          },
+        ],
+      })
+      setIsFormOpen(true)
+    }
+  }, [searchParams])
 
   const poQuery = usePurchaseOrders(filters)
   const dashboardQuery = useDashboard(filters.branchId ?? undefined)
@@ -53,9 +82,24 @@ export default function PurchaseOrdersPage() {
     if (selectedId) void queryClient.invalidateQueries({ queryKey: purchaseOrderQueryKeys.detail(selectedId) })
   }
 
+  const handleCloseForm = () => {
+    setIsFormOpen(false)
+    setInitialFormValues(undefined)
+    if (searchParams.get('newPo') || searchParams.get('productId')) {
+      searchParams.delete('newPo')
+      searchParams.delete('productId')
+      searchParams.delete('quantity')
+      searchParams.delete('supplierId')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }
+
   const createMutation = useMutation({
     mutationFn: (values: PurchaseOrderFormValues) => createPurchaseOrder(filters.branchId as string, values),
-    onSuccess: () => { invalidate(); setIsFormOpen(false) },
+    onSuccess: () => {
+      invalidate()
+      handleCloseForm()
+    },
   })
   const submitMutation = useMutation({ mutationFn: (po: PurchaseOrder) => submitPurchaseOrder(po), onSuccess: invalidate })
   const decideMutation = useMutation({ mutationFn: ({ po, decision, reason }: { po: PurchaseOrder; decision: 'approved' | 'rejected'; reason?: string }) => decidePurchaseOrder(po, decision, reason), onSuccess: invalidate })
@@ -76,7 +120,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Purchase orders" description="Draft, submit, and approve purchase orders for your branch." actions={<Button disabled={!filters.branchId} onClick={() => setIsFormOpen(true)}><FilePlus2 aria-hidden="true" size={18} /> Create purchase order</Button>} />
+      <PageHeader title="Purchase orders" description="Draft, submit, and approve purchase orders for your branch." actions={<Button disabled={!filters.branchId} onClick={() => { setInitialFormValues(undefined); setIsFormOpen(true) }}><FilePlus2 aria-hidden="true" size={18} /> Create purchase order</Button>} />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
 
       {/* Relocated Pending Procurement Panel */}
@@ -109,7 +153,17 @@ export default function PurchaseOrdersPage() {
 
       <nav aria-label="Purchase order pagination" className="flex items-center justify-between gap-3"><p className="text-sm text-muted">Page {filters.page} of {totalPages}</p><div className="flex gap-2"><Button disabled={filters.page <= 1} variant="secondary" onClick={() => updateFilter('page', filters.page - 1)}>Previous</Button><Button disabled={filters.page >= totalPages} variant="secondary" onClick={() => updateFilter('page', filters.page + 1)}>Next</Button></div></nav>
 
-      {isFormOpen ? <PurchaseOrderFormDialog isSaving={createMutation.isPending} productOptions={productOptions} supplierOptions={supplierOptions} unitOptions={unitOptions} onClose={() => setIsFormOpen(false)} onSave={(values) => createMutation.mutate(values)} /> : null}
+      {isFormOpen ? (
+        <PurchaseOrderFormDialog
+          initialValues={initialFormValues}
+          isSaving={createMutation.isPending}
+          productOptions={productOptions}
+          supplierOptions={supplierOptions}
+          unitOptions={unitOptions}
+          onClose={handleCloseForm}
+          onSave={(values) => createMutation.mutate(values)}
+        />
+      ) : null}
       {selectedQuery.data ? (
         <PurchaseOrderDetailsDrawer
           isActing={isActing}

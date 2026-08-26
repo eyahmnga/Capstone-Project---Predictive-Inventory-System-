@@ -16,6 +16,7 @@ type PurchaseOrderFormDialogProps = {
   supplierOptions: SupplierOption[]
   productOptions: ProductOption[]
   unitOptions: UnitOption[]
+  initialValues?: Partial<PurchaseOrderFormValues>
   isSaving: boolean
   onClose: () => void
   onSave: (values: PurchaseOrderFormValues) => void
@@ -23,9 +24,47 @@ type PurchaseOrderFormDialogProps = {
 
 const emptyLine: PurchaseOrderLineInput = { productId: '', unitId: '', orderedQuantity: '', unitCost: '', taxRate: '12', discountAmount: '0' }
 
-export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitOptions, isSaving, onClose, onSave }: PurchaseOrderFormDialogProps) {
-  const [values, setValues] = useState<PurchaseOrderFormValues>({
-    supplierId: '', currencyCode: 'PHP', expectedReceiptAt: '', supplierReference: '', notes: '', lines: [{ ...emptyLine }],
+export function PurchaseOrderFormDialog({
+  supplierOptions,
+  productOptions,
+  unitOptions,
+  initialValues,
+  isSaving,
+  onClose,
+  onSave,
+}: PurchaseOrderFormDialogProps) {
+  const [values, setValues] = useState<PurchaseOrderFormValues>(() => {
+    const defaultUnitId = unitOptions[0]?.id ?? ''
+    if (initialValues) {
+      const initialLines =
+        initialValues.lines && initialValues.lines.length > 0
+          ? initialValues.lines.map((line) => ({
+              productId: line.productId || '',
+              unitId: line.unitId || defaultUnitId,
+              orderedQuantity: line.orderedQuantity || '',
+              unitCost: line.unitCost || '100',
+              taxRate: line.taxRate || '12',
+              discountAmount: line.discountAmount || '0',
+            }))
+          : [{ ...emptyLine, unitId: defaultUnitId }]
+
+      return {
+        supplierId: initialValues.supplierId || supplierOptions[0]?.id || '',
+        currencyCode: initialValues.currencyCode || 'PHP',
+        expectedReceiptAt: initialValues.expectedReceiptAt || '',
+        supplierReference: initialValues.supplierReference || '',
+        notes: initialValues.notes || '',
+        lines: initialLines,
+      }
+    }
+    return {
+      supplierId: supplierOptions[0]?.id || '',
+      currencyCode: 'PHP',
+      expectedReceiptAt: '',
+      supplierReference: '',
+      notes: '',
+      lines: [{ ...emptyLine, unitId: defaultUnitId }],
+    }
   })
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -46,7 +85,10 @@ export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitO
     setValues((state) => ({ ...state, lines: state.lines.map((line, i) => (i === index ? { ...line, ...patch } : line)) }))
   }
 
-  const addLine = () => setValues((state) => ({ ...state, lines: [...state.lines, { ...emptyLine }] }))
+  const addLine = () => {
+    const defaultUnitId = unitOptions[0]?.id ?? ''
+    setValues((state) => ({ ...state, lines: [...state.lines, { ...emptyLine, unitId: defaultUnitId }] }))
+  }
   const removeLine = (index: number) => setValues((state) => ({ ...state, lines: state.lines.filter((_, i) => i !== index) }))
 
   const isValid = values.supplierId !== '' && values.lines.length > 0
@@ -90,7 +132,10 @@ export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitO
                         placeholder="Search product..."
                         required
                         value={line.productId}
-                        onChange={(productId) => updateLine(index, { productId })}
+                        onChange={(productId) => {
+                          const unitId = line.unitId || unitOptions[0]?.id || ''
+                          updateLine(index, { productId, unitId })
+                        }}
                       />
                     </div>
                     <label className="text-xs font-semibold text-muted">Unit
