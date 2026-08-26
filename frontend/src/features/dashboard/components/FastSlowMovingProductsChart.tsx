@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Flame, Package, Snail, Sparkles, Zap } from 'lucide-react'
 import type { Product } from '@/features/products/types/product'
 import type { ForecastRunItem } from '@/features/forecasting/types/forecast'
+import type { ProductVelocityItem } from '@/features/dashboard/types/dashboard'
 import { formatQuantity } from '@/shared/lib/formatters'
 
 export type SimpleVelocityProduct = {
@@ -12,6 +13,7 @@ export type SimpleVelocityProduct = {
   sellingPrice: number
   onHandQuantity: number
   monthlySalesEstimate: number
+  unitsSold: number
   daysOnHand: number
   isFastMoving: boolean
 }
@@ -19,6 +21,7 @@ export type SimpleVelocityProduct = {
 type FastSlowMovingProductsChartProps = {
   products?: Product[]
   forecastItems?: ForecastRunItem[]
+  productVelocity?: Record<string, ProductVelocityItem>
 }
 
 type ViewFilter = 'both' | 'fast' | 'slow'
@@ -26,6 +29,7 @@ type ViewFilter = 'both' | 'fast' | 'slow'
 export function FastSlowMovingProductsChart({
   products = [],
   forecastItems = [],
+  productVelocity,
 }: FastSlowMovingProductsChartProps) {
   const [viewFilter, setViewFilter] = useState<ViewFilter>('both')
 
@@ -35,50 +39,51 @@ export function FastSlowMovingProductsChart({
       return { fastMovingList: [], slowMovingList: [], maxSales: 30, maxStock: 100 }
     }
 
-    // Map forecast items by product ID and SKU for robust lookup
-    const forecastMap = new Map<string, number>()
+    // 1. Live product sales velocity from real POS transactions
+    const velocityMap = new Map<string, { totalSold: number; monthlyRate: number }>()
+
+    if (productVelocity) {
+      Object.values(productVelocity).forEach((pv) => {
+        const soldQty = Number(pv.totalSoldQuantity) || 0
+        if (soldQty > 0) {
+          velocityMap.set(pv.productId, {
+            totalSold: soldQty,
+            monthlyRate: Math.max(soldQty, 1),
+          })
+        }
+      })
+    }
+
+    // 2. Also incorporate statistical forecast items if available
     forecastItems.forEach((item) => {
       const demand =
         Number(item.forecastQuantity) ||
         (item.demandTotal ? Number(item.demandTotal) / Math.max(1, item.historyPeriodCount) : 0) ||
         0
-      if (item.productId) forecastMap.set(item.productId, demand)
-      if (item.productSku) forecastMap.set(item.productSku, demand)
+      if (demand > 0 && item.productId) {
+        const existing = velocityMap.get(item.productId)
+        if (existing) {
+          existing.monthlyRate = Math.max(existing.monthlyRate, Math.round(demand))
+        } else {
+          velocityMap.set(item.productId, {
+            totalSold: 0,
+            monthlyRate: Math.round(demand),
+          })
+        }
+      }
     })
 
-    const processed: SimpleVelocityProduct[] = products.map((product, idx) => {
+    const processed: SimpleVelocityProduct[] = products.map((product) => {
       const onHand = Number(product.stock?.onHandQuantity) || 0
       const price = Number(product.sellingPrice) || 0
 
-      // Match demand from forecast or synthesize consistent velocity from product characteristics
-      let monthlySales = forecastMap.get(product.id) ?? forecastMap.get(product.sku)
-      if (monthlySales === undefined || monthlySales <= 0) {
-        const lowerName = product.name.toLowerCase()
-        const isHighTurnoverFilter =
-          lowerName.includes('sediment') ||
-          lowerName.includes('carbon block') ||
-          lowerName.includes('quick connect') ||
-          lowerName.includes('membrane')
+      // Match velocity strictly from real POS sales or forecast
+      const velocity = velocityMap.get(product.id)
+      const unitsSold = velocity?.totalSold ?? 0
+      const monthlySales = velocity?.monthlyRate ?? unitsSold
 
-        const isMediumTurnover =
-          lowerName.includes('filter') ||
-          lowerName.includes('chlorine') ||
-          lowerName.includes('gac') ||
-          lowerName.includes('ph booster')
-
-        if (isHighTurnoverFilter) {
-          // Fast Movers: 30 to 48 pcs/month
-          monthlySales = 32 + ((idx * 5) % 18)
-        } else if (isMediumTurnover) {
-          monthlySales = 16 + ((idx * 3) % 12)
-        } else {
-          // Slow Movers (Heavy pumps, pressure tanks, 25kg bulk salt bags, large valves): 1 to 4 pcs/month
-          monthlySales = Math.max(1, 4 - (idx % 3))
-        }
-      }
-
-      const dailyRate = monthlySales / 30
-      const daysOnHand = dailyRate > 0 ? Math.round(onHand / dailyRate) : onHand > 0 ? 300 : 0
+      const dailyRate = monthlySales > 0 ? monthlySales / 30 : 0
+      const daysOnHand = dailyRate > 0 ? Math.round(onHand / dailyRate) : onHand > 0 ? 999 : 0
 
       return {
         id: product.id,
@@ -87,35 +92,33 @@ export function FastSlowMovingProductsChart({
         categoryName: product.category?.name,
         sellingPrice: price,
         onHandQuantity: onHand,
-        monthlySalesEstimate: Math.round(monthlySales),
+        monthlySalesEstimate: monthlySales,
+        unitsSold,
         daysOnHand,
         isFastMoving: false,
       }
     })
 
-    // Calculate median sales velocity to partition fast vs slow movers reliably
-    const sortedBySales = [...processed].sort(
-      (a, b) => b.monthlySalesEstimate - a.monthlySalesEstimate,
+    // 1. Fast-Moving: Only items with real sales > 0, ranked from highest sales to lowest (up to top 5)
+    const itemsWithSales = processed.filter((p) => p.unitsSold > 0 || p.monthlySalesEstimate > 0)
+    const sortedBySales = [...itemsWithSales].sort(
+      (a, b) =>
+        b.unitsSold - a.unitsSold || b.monthlySalesEstimate - a.monthlySalesEstimate,
     )
-    const midIndex = Math.max(1, Math.floor(sortedBySales.length / 2))
-    const velocityThreshold = sortedBySales[midIndex]?.monthlySalesEstimate ?? 10
+    const fast = sortedBySales.slice(0, 5).map((p) => ({ ...p, isFastMoving: true }))
 
-    // 1. Fast-Moving: Ranked from GREATEST fast-moving (highest monthly sales) down to least
-    const fast = sortedBySales
-      .filter((p) => p.monthlySalesEstimate >= velocityThreshold)
-      .sort((a, b) => b.monthlySalesEstimate - a.monthlySalesEstimate)
-      .slice(0, 5)
-      .map((p) => ({ ...p, isFastMoving: true }))
-
-    // 2. Slow-Moving: Items with lower velocity, ranked from LOTS of stock quantity (highest on-hand) down to least
-    const slowCandidates = sortedBySales.filter((p) => !fast.some((f) => f.id === p.id))
-    const slow = (slowCandidates.length > 0 ? slowCandidates : sortedBySales)
-      .sort((a, b) => b.onHandQuantity - a.onHandQuantity || a.monthlySalesEstimate - b.monthlySalesEstimate)
+    // 2. Slow-Moving: Items with low or zero sales, ranked by highest stock on-hand (up to top 5)
+    const slowCandidates = processed.filter((p) => !fast.some((f) => f.id === p.id))
+    const slow = [...slowCandidates]
+      .sort(
+        (a, b) =>
+          b.onHandQuantity - a.onHandQuantity || a.monthlySalesEstimate - b.monthlySalesEstimate,
+      )
       .slice(0, 5)
       .map((p) => ({ ...p, isFastMoving: false }))
 
-    const maxS = Math.max(...fast.map((p) => p.monthlySalesEstimate), 30)
-    const maxQ = Math.max(...slow.map((p) => p.onHandQuantity), 50)
+    const maxS = Math.max(...fast.map((p) => Math.max(p.unitsSold, p.monthlySalesEstimate)), 10)
+    const maxQ = Math.max(...slow.map((p) => p.onHandQuantity), 20)
 
     return {
       fastMovingList: fast,
@@ -123,7 +126,7 @@ export function FastSlowMovingProductsChart({
       maxSales: maxS,
       maxStock: maxQ,
     }
-  }, [products, forecastItems])
+  }, [products, forecastItems, productVelocity])
 
   return (
     <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-xs">
@@ -134,9 +137,7 @@ export function FastSlowMovingProductsChart({
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
               <Zap size={14} />
             </div>
-            <h2 className="text-sm font-bold text-slate-800">
-              Fast and Slow Moving Products
-            </h2>
+            <h2 className="text-sm font-bold text-slate-800">Fast and Slow Moving Products</h2>
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">
             Fast items sorted by sales velocity &bull; Slow items sorted by stock quantity
@@ -220,12 +221,15 @@ export function FastSlowMovingProductsChart({
                 {/* Items List */}
                 <div className="space-y-1.5 pt-2">
                   {fastMovingList.length === 0 ? (
-                    <p className="text-[11px] text-slate-500 py-2 text-center">No fast-moving items yet.</p>
+                    <p className="text-[11px] text-slate-500 py-3 text-center italic">
+                      No sales recorded yet. Fast-moving items will appear here automatically as sales are made in POS.
+                    </p>
                   ) : (
                     fastMovingList.map((item, index) => {
+                      const displayQty = item.unitsSold > 0 ? item.unitsSold : item.monthlySalesEstimate
                       const barPercent = Math.min(
                         100,
-                        Math.max(15, (item.monthlySalesEstimate / maxSales) * 100),
+                        Math.max(15, (displayQty / maxSales) * 100),
                       )
                       return (
                         <div
@@ -242,7 +246,7 @@ export function FastSlowMovingProductsChart({
                             </div>
                             <div className="text-right shrink-0 flex items-center gap-1.5">
                               <span className="text-xs font-extrabold text-emerald-700 font-mono">
-                                ~{item.monthlySalesEstimate}/mo
+                                {item.unitsSold > 0 ? `${item.unitsSold} sold` : `~${item.monthlySalesEstimate}/mo`}
                               </span>
                               <span className="text-[10px] text-slate-400">
                                 &bull; {formatQuantity(item.onHandQuantity)} in stock
@@ -316,7 +320,7 @@ export function FastSlowMovingProductsChart({
                                 {formatQuantity(item.onHandQuantity)} in stock
                               </span>
                               <span className="text-[10px] text-slate-400">
-                                &bull; ~{item.monthlySalesEstimate}/mo
+                                &bull; {item.unitsSold > 0 ? `${item.unitsSold} sold` : `~${item.monthlySalesEstimate}/mo`}
                               </span>
                             </div>
                           </div>

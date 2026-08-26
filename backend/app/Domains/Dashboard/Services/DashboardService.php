@@ -41,6 +41,7 @@ class DashboardService
             'pendingPurchaseOrders' => $this->buildPendingPurchaseOrders($branchId),
             'recentSales' => $this->buildRecentSales($branchId),
             'salesTrend' => $this->buildSalesTrend($branchId, $from, $to),
+            'productVelocity' => $this->buildProductVelocity($branchId),
             'forecastSummary' => $this->buildForecastSummary($branchId),
             'syncHealth' => $this->buildSyncHealth($branchId),
         ];
@@ -266,5 +267,36 @@ class DashboardService
             'acceptedCount' => (int) ($counts['accepted'] ?? 0),
             'lastReceivedAt' => $lastReceivedAt ? CarbonImmutable::parse($lastReceivedAt)->toIso8601String() : null,
         ];
+    }
+
+    /**
+     * @return array<string, array{productId: string, totalSoldQuantity: string, transactionCount: int, lastSoldAt: ?string}>
+     */
+    private function buildProductVelocity(int $branchId): array
+    {
+        $salesByProduct = DB::table('sale_lines')
+            ->join('sales', 'sales.id', '=', 'sale_lines.sale_id')
+            ->where('sales.branch_id', $branchId)
+            ->where('sales.status', 'completed')
+            ->select([
+                'sale_lines.product_id',
+                DB::raw('SUM(sale_lines.quantity) as totalSoldQuantity'),
+                DB::raw('COUNT(DISTINCT sales.id) as transactionCount'),
+                DB::raw('MAX(sales.sold_at) as lastSoldAt'),
+            ])
+            ->groupBy('sale_lines.product_id')
+            ->get();
+
+        $result = [];
+        foreach ($salesByProduct as $row) {
+            $result[(string) $row->product_id] = [
+                'productId' => (string) $row->product_id,
+                'totalSoldQuantity' => (string) $row->totalSoldQuantity,
+                'transactionCount' => (int) $row->transactionCount,
+                'lastSoldAt' => $row->lastSoldAt,
+            ];
+        }
+
+        return $result;
     }
 }

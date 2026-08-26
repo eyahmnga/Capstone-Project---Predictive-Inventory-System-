@@ -14,6 +14,7 @@ type ReorderPolicyDetailsDrawerProps = {
   canCalculateEoq: boolean
   isActing: boolean
   onClose: () => void
+  onEditPolicy?: (policy: ReorderPolicy) => void
   onRecalculateRop: () => void
   onCalculateEoq: (annualDemandQuantity: string, orderingCost: string, annualHoldingCostPerUnit: string) => void
 }
@@ -24,6 +25,7 @@ export function ReorderPolicyDetailsDrawer({
   canCalculateEoq,
   isActing,
   onClose,
+  onEditPolicy,
   onRecalculateRop,
   onCalculateEoq,
 }: ReorderPolicyDetailsDrawerProps) {
@@ -62,9 +64,21 @@ export function ReorderPolicyDetailsDrawer({
               </h2>
               <p className="font-mono text-xs text-muted mt-0.5">{policy.productSku}</p>
             </div>
-            <Button aria-label="Close reorder policy details" size="icon" variant="ghost" onClick={onClose}>
-              <X aria-hidden="true" size={18} />
-            </Button>
+            <div className="flex items-center gap-2">
+              {onEditPolicy && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onEditPolicy(policy)}
+                  className="text-xs font-semibold"
+                >
+                  Edit Policy
+                </Button>
+              )}
+              <Button aria-label="Close reorder policy details" size="icon" variant="ghost" onClick={onClose}>
+                <X aria-hidden="true" size={18} />
+              </Button>
+            </div>
           </header>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">

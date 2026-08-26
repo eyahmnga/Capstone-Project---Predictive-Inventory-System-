@@ -294,6 +294,7 @@ export default function DashboardPage() {
           <section aria-label="Fast and Slow Moving Products">
             <FastSlowMovingProductsChart
               forecastItems={forecastDetailQuery.data?.items}
+              productVelocity={dashboardQuery.data?.data.productVelocity}
               products={productsQuery.data?.data}
             />
           </section>

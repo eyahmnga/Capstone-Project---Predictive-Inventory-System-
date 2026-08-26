@@ -63,17 +63,40 @@ export type Sale = {
   version: number
 }
 
+export type DatePeriodFilter =
+  | 'all'
+  | 'today'
+  | 'yesterday'
+  | 'this_month'
+  | 'last_month'
+  | 'this_year'
+  | 'specific_day'
+  | 'specific_month'
+  | 'specific_year'
+  | 'custom'
+
 export type SaleFilters = {
   branchId: string | null
   status: SaleStatus | 'all'
   saleNumber: string
+  period?: DatePeriodFilter
+  specificDate?: string
+  specificMonth?: string
+  specificYear?: string
+  from?: string
+  to?: string
   page: number
   perPage: number
 }
 
 export type PaginatedSales = {
   data: Sale[]
-  meta: { page: number; perPage: number; total: number }
+  meta: {
+    page: number
+    perPage: number
+    total: number
+    totalSalesAmount?: string
+  }
 }
 
 export type RefundLineInput = { productId: string; quantity: number }

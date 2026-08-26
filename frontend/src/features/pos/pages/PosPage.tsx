@@ -173,7 +173,7 @@ export default function PosPage() {
           )}
         </div>
         <p className="hidden sm:block text-xs text-muted">
-          Scan barcode or tap products to ring up sale
+          Tap products or search by SKU to ring up sale
         </p>
       </div>
 

@@ -36,6 +36,16 @@ export type CreateReorderPolicyPayload = {
   leadTimeBasis: LeadTimeBasis
 }
 
+export type UpdateReorderPolicyPayload = {
+  preferredSupplierId?: string | null
+  safetyStockQuantity?: string
+  safetyStockBasis?: SafetyStockBasis
+  leadTimeDaysOverride?: string | null
+  leadTimeBasis?: LeadTimeBasis
+  isActive?: boolean
+  version: number
+}
+
 export type PaginatedReorderPolicies = {
   data: ReorderPolicy[]
   meta: { page: number; perPage: number; total: number }

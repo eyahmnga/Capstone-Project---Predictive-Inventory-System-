@@ -61,12 +61,20 @@ export type SyncHealth = {
   lastReceivedAt: string | null
 }
 
+export type ProductVelocityItem = {
+  productId: string
+  totalSoldQuantity: string
+  transactionCount: number
+  lastSoldAt: string | null
+}
+
 export type DashboardData = {
   kpis: DashboardKpis
   lowStock: LowStockItem[]
   pendingPurchaseOrders: { count: number; items: PendingPurchaseOrderItem[] }
   recentSales: RecentSaleItem[]
   salesTrend: SalesTrendPoint[]
+  productVelocity?: Record<string, ProductVelocityItem>
   forecastSummary: ForecastSummary
   syncHealth: SyncHealth
 }

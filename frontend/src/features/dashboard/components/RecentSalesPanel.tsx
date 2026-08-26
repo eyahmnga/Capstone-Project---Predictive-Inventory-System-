@@ -11,7 +11,9 @@ export function RecentSalesPanel({ sales }: { sales: RecentSaleItem[] }) {
           <h2 className="text-lg font-semibold text-ink">Recent sales</h2>
           <p className="mt-1 text-sm text-muted">Latest completed transactions for this branch.</p>
         </div>
-        <Link className="text-sm font-medium text-brand-700 hover:underline" to="/sales">View all</Link>
+        <Link className="text-sm font-medium text-brand-700 hover:underline" to="/sales">
+          View all
+        </Link>
       </div>
       {sales.length === 0 ? (
         <p className="mt-4 text-sm text-muted">No completed sales yet.</p>
@@ -28,7 +30,9 @@ export function RecentSalesPanel({ sales }: { sales: RecentSaleItem[] }) {
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-semibold tabular-nums text-ink">{formatQuantity(sale.totalAmount)}</p>
-                <time className="text-xs text-muted">{sale.soldAt ? new Date(sale.soldAt).toLocaleTimeString() : '—'}</time>
+                <time className="text-xs text-muted">
+                  {sale.soldAt ? new Date(sale.soldAt).toLocaleTimeString() : '—'}
+                </time>
               </div>
             </li>
           ))}

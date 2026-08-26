@@ -52,7 +52,7 @@ export function DashboardQuickActionsCard({ onAddProduct }: DashboardQuickAction
                 Point of Sale (POS)
               </span>
               <span className="block text-[11px] text-muted line-clamp-1 mt-0.5">
-                Barcode scan, cart & checkout
+                Catalog, cart & checkout
               </span>
             </div>
           </Link>

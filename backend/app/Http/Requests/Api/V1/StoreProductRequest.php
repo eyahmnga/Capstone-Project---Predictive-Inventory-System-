@@ -18,7 +18,7 @@ class StoreProductRequest extends FormRequest
         return [
             'categoryId' => ['required', 'integer', Rule::exists('categories', 'id')->where('is_active', true)],
             'stockUnitId' => ['required', 'integer', Rule::exists('units_of_measure', 'id')->where('is_active', true)],
-            'sku' => ['required', 'string', 'max:100'],
+            'sku' => ['nullable', 'string', 'max:100'],
             'barcode' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],

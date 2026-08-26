@@ -8,6 +8,7 @@ import type {
   ReorderPolicyFilters,
   RestockingAlert,
   RestockingAlertFilters,
+  UpdateReorderPolicyPayload,
 } from '@/features/restocking/types/restocking'
 
 type ApiEnvelope<T> = { data: T; meta?: { page: number; perPage: number; total: number } }
@@ -34,6 +35,11 @@ export async function getReorderPolicies(filters: ReorderPolicyFilters): Promise
 
 export async function createReorderPolicy(payload: CreateReorderPolicyPayload): Promise<ReorderPolicy> {
   const response = await apiClient.post<ApiEnvelope<ReorderPolicy>>('/reorder-policies', payload)
+  return response.data.data
+}
+
+export async function updateReorderPolicy(policy: ReorderPolicy, payload: UpdateReorderPolicyPayload): Promise<ReorderPolicy> {
+  const response = await apiClient.patch<ApiEnvelope<ReorderPolicy>>(`/reorder-policies/${policy.id}`, payload)
   return response.data.data
 }
 

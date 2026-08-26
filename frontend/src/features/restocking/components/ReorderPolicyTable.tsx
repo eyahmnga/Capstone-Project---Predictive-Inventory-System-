@@ -1,4 +1,4 @@
-import { Calculator, PanelRightOpen } from 'lucide-react'
+import { Calculator, Edit3, PanelRightOpen } from 'lucide-react'
 import type { ReorderPolicy } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
@@ -11,7 +11,15 @@ const stateBadge = (isActive: boolean) => (
   </span>
 )
 
-export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPolicy[]; onView: (policy: ReorderPolicy) => void }) {
+export function ReorderPolicyTable({
+  policies,
+  onView,
+  onEdit,
+}: {
+  policies: ReorderPolicy[]
+  onView: (policy: ReorderPolicy) => void
+  onEdit?: (policy: ReorderPolicy) => void
+}) {
   return (
     <>
       <div className="space-y-3 md:hidden">
@@ -30,6 +38,18 @@ export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPoli
                 { label: 'Lead time', value: `${policy.leadTimeDaysOverride ?? '—'} days` },
                 { label: 'Reorder trigger point (ROP)', value: policy.reorderPointQuantity ? `Trigger at ≤ ${formatQuantity(policy.reorderPointQuantity)} pcs` : 'Not calculated', full: true },
               ]}
+              actions={
+                <div className="flex gap-2">
+                  {onEdit && (
+                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onEdit(policy) }}>
+                      <Edit3 size={14} /> Edit
+                    </Button>
+                  )}
+                  <Button size="sm" variant="primary" onClick={() => onView(policy)}>
+                    <Calculator size={14} /> EOQ
+                  </Button>
+                </div>
+              }
               onClick={() => onView(policy)}
             />
           ))
@@ -45,7 +65,7 @@ export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPoli
               <TableHeaderCell align="right">Lead Time</TableHeaderCell>
               <TableHeaderCell align="right">Reorder Point (ROP)</TableHeaderCell>
               <TableHeaderCell>Policy Status</TableHeaderCell>
-              <TableHeaderCell align="right">EOQ & Actions</TableHeaderCell>
+              <TableHeaderCell align="right">Actions</TableHeaderCell>
             </tr>
           </TableHead>
           <TableBody>
@@ -83,7 +103,19 @@ export function ReorderPolicyTable({ policies, onView }: { policies: ReorderPoli
                     {stateBadge(policy.isActive)}
                   </TableCell>
                   <TableCell align="right">
-                    <div className="flex justify-end gap-1.5">
+                    <div className="flex justify-end gap-1.5 items-center">
+                      {onEdit && (
+                        <Button
+                          aria-label={`Edit policy for ${policy.productName}`}
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => onEdit(policy)}
+                          className="text-xs font-semibold hover:border-slate-400"
+                        >
+                          <Edit3 size={13} className="text-slate-600" />
+                          Edit
+                        </Button>
+                      )}
                       <Button
                         aria-label={`Calculate EOQ & view policy for ${policy.productName}`}
                         size="sm"

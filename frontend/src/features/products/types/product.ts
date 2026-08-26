@@ -3,6 +3,7 @@ export type ProductType = 'stock' | 'non_stock' | 'service'
 export type CategoryOption = {
   id: string
   name: string
+  code?: string
 }
 
 export type UnitOption = {

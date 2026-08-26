@@ -4,10 +4,11 @@ import type { UnitOption } from '@/features/products/types/product'
 import type { SupplierOption } from '@/features/suppliers/types/supplier'
 import type { PurchaseOrderFormValues, PurchaseOrderLineInput } from '@/features/purchase-orders/types/purchaseOrder'
 import { Button } from '@/shared/components/Button'
-import { cn } from '@/shared/lib/cn'
-import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, sheetHeaderClass } from '@/shared/lib/modalClasses'
 import { Portal } from '@/shared/components/Portal'
+import { SearchableProductSelect } from '@/shared/components/SearchableProductSelect'
+import { cn } from '@/shared/lib/cn'
 import { cleanNumericInput } from '@/shared/lib/formatters'
+import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, sheetHeaderClass } from '@/shared/lib/modalClasses'
 
 type ProductOption = { id: string; sku: string; name: string }
 
@@ -80,12 +81,18 @@ export function PurchaseOrderFormDialog({ supplierOptions, productOptions, unitO
               <div className="mt-2 space-y-3">
                 {values.lines.map((line, index) => (
                   <div className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:grid sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_90px_100px_80px_80px_36px] sm:items-end" key={index}>
-                    <label className="text-xs font-semibold text-muted">Product
-                      <select className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" required value={line.productId} onChange={(event) => updateLine(index, { productId: event.target.value })}>
-                        <option value="" disabled>Select</option>
-                        {productOptions.map((option) => <option key={option.id} value={option.id}>{option.sku} — {option.name}</option>)}
-                      </select>
-                    </label>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-muted">
+                        Product
+                      </label>
+                      <SearchableProductSelect
+                        options={productOptions}
+                        placeholder="Search product..."
+                        required
+                        value={line.productId}
+                        onChange={(productId) => updateLine(index, { productId })}
+                      />
+                    </div>
                     <label className="text-xs font-semibold text-muted">Unit
                       <select className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-brand-600" required value={line.unitId} onChange={(event) => updateLine(index, { unitId: event.target.value })}>
                         <option value="" disabled>Select</option>

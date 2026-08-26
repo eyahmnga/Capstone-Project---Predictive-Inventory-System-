@@ -24,7 +24,7 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
 
-        $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
+        $perPage = min(max((int) $request->integer('perPage', 500), 1), 5000);
         $page = max((int) $request->integer('page', 1), 1);
 
         $query = Product::query()->with(['category', 'stockUnit']);
@@ -78,7 +78,7 @@ class ProductController extends Controller
             $product = $this->productService->create([
                 'category_id' => $validated['categoryId'],
                 'stock_unit_id' => $validated['stockUnitId'],
-                'sku' => $validated['sku'],
+                'sku' => $validated['sku'] ?? null,
                 'barcode' => $validated['barcode'] ?? null,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,

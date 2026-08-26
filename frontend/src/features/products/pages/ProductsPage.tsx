@@ -19,6 +19,8 @@ import { PageHeader } from '@/shared/components/PageHeader'
 import { useToast } from '@/shared/components/Toast'
 import { cn } from '@/shared/lib/cn'
 
+const PAGE_SIZE = 15
+
 const defaultFilters: ProductFilters = {
   search: '',
   categoryId: 'all',
@@ -26,7 +28,7 @@ const defaultFilters: ProductFilters = {
   active: 'all',
   branchId: null,
   page: 1,
-  perPage: 25,
+  perPage: 100, // Fetch full active catalog so client-side stock status filtering works across all 32 items
 }
 
 export default function ProductsPage() {
@@ -69,15 +71,18 @@ export default function ProductsPage() {
       const next = { ...state }
       if (next.search !== currentSearch) {
         next.search = currentSearch
+        next.page = 1
         changed = true
       }
       if (next.categoryId !== currentCategory) {
         next.categoryId = currentCategory
+        next.page = 1
         changed = true
       }
       const targetActive = currentView === 'archived' ? 'archived' : (state.active === 'archived' ? 'all' : state.active)
       if (next.active !== targetActive) {
         next.active = targetActive
+        next.page = 1
         changed = true
       }
       return changed ? next : state
@@ -175,28 +180,43 @@ export default function ProductsPage() {
     }))
   }, [rawProducts, reorderPoliciesQuery.data, restockingAlertsQuery.data])
 
-  // When a stockStatusFilter is selected, sort matching items to the TOP of the table!
-  const displayedProducts = useMemo(() => {
-    if (stockStatusFilter === 'all') {
-      return enrichedProducts
-    }
-
-    return [...enrichedProducts].sort((a, b) => {
-      const aMatches = a.computedStockStatus === stockStatusFilter
-      const bMatches = b.computedStockStatus === stockStatusFilter
-
-      if (aMatches && !bMatches) return -1
-      if (!aMatches && bMatches) return 1
-      return 0
+  // STRICT Filter: Filter out non-matching products when stockStatusFilter is active
+  const filteredProducts = useMemo(() => {
+    return enrichedProducts.filter((product) => {
+      // Category Filter
+      if (filters.categoryId !== 'all' && product.category?.id !== filters.categoryId) {
+        return false
+      }
+      // Product Type Filter
+      if (filters.productType !== 'all' && product.productType !== filters.productType) {
+        return false
+      }
+      // Search Filter
+      if (filters.search) {
+        const query = filters.search.toLowerCase().trim()
+        const nameMatch = product.name.toLowerCase().includes(query)
+        const skuMatch = product.sku.toLowerCase().includes(query)
+        if (!nameMatch && !skuMatch) return false
+      }
+      // Strict Stock Status Filter
+      if (stockStatusFilter !== 'all') {
+        if (product.computedStockStatus !== stockStatusFilter) {
+          return false
+        }
+      }
+      return true
     })
-  }, [enrichedProducts, stockStatusFilter])
+  }, [enrichedProducts, filters.categoryId, filters.productType, filters.search, stockStatusFilter])
 
-  const matchingCount = useMemo(() => {
-    if (stockStatusFilter === 'all') return 0
-    return enrichedProducts.filter((p) => p.computedStockStatus === stockStatusFilter).length
-  }, [enrichedProducts, stockStatusFilter])
+  const totalMatchingProducts = filteredProducts.length
+  const totalPages = Math.max(1, Math.ceil(totalMatchingProducts / PAGE_SIZE))
+  const currentPage = Math.min(filters.page, totalPages)
 
-  const totalPages = Math.max(1, Math.ceil((productsQuery.data?.meta.total ?? 0) / filters.perPage))
+  // Paginated slice for the current view
+  const displayedProducts = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE
+    return filteredProducts.slice(start, start + PAGE_SIZE)
+  }, [filteredProducts, currentPage])
 
   const updateFilter = <K extends keyof ProductFilters>(key: K, value: ProductFilters[K]) =>
     setFilters((state) => ({ ...state, [key]: value, page: key === 'page' ? Number(value) : 1 }))
@@ -234,6 +254,7 @@ export default function ProductsPage() {
 
   const handleStockStatusFilterChange = (newStatus: string) => {
     setStockStatusFilter(newStatus)
+    setFilters((state) => ({ ...state, page: 1 }))
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (newStatus === 'all') {
@@ -264,9 +285,9 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <PageHeader
         actions={
-          hasPermission('products.create') ? (
+          !isArchivedView && hasPermission('catalog.products.manage') ? (
             <Button onClick={openCreate}>
-              <PackagePlus aria-hidden="true" size={18} /> Add product
+              <PackagePlus aria-hidden="true" size={18} /> New Product
             </Button>
           ) : undefined
         }
@@ -329,21 +350,21 @@ export default function ProductsPage() {
       )}
 
       {/* Filter Controls Bar */}
-      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
+      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_200px_180px_180px]">
         {/* Search */}
         <label className="relative block">
           <span className="sr-only">Search products</span>
           <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
           <input
             className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
-            placeholder="Search by product, SKU, or barcode"
+            placeholder="Search by product name or SKU"
             type="search"
             value={filters.search}
             onChange={(event: ChangeEvent<HTMLInputElement>) => updateFilter('search', event.target.value)}
           />
         </label>
 
-        {/* Stock Level Sorting Filter */}
+        {/* Stock Level Filter */}
         <select
           aria-label="Filter by stock status"
           className="h-11 rounded-xl border border-border bg-surface px-3 text-sm font-medium outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
@@ -351,9 +372,9 @@ export default function ProductsPage() {
           onChange={(event) => handleStockStatusFilterChange(event.target.value)}
         >
           <option value="all">All stock levels</option>
-          <option value="low_stock">⚠️ Low stock (top)</option>
-          <option value="overstock">📦 Overstocked (top)</option>
-          <option value="out_of_stock">🚫 Out of stock (top)</option>
+          <option value="low_stock">⚠️ Low stock only</option>
+          <option value="overstock">📦 Overstocked only</option>
+          <option value="out_of_stock">🚫 Out of stock only</option>
         </select>
 
         {/* Categories */}
@@ -384,7 +405,7 @@ export default function ProductsPage() {
         </select>
       </section>
 
-      {/* Prominent Active Priority Banner */}
+      {/* Prominent Active Filter Banner */}
       {stockStatusFilter !== 'all' && (
         <div
           className={cn(
@@ -401,14 +422,14 @@ export default function ProductsPage() {
 
             <div>
               <p className="text-sm font-bold">
-                {stockStatusFilter === 'low_stock' && `Low Stock Priority View: ${matchingCount} low-stock product${matchingCount === 1 ? '' : 's'} identified`}
-                {stockStatusFilter === 'overstock' && `Overstock Priority View: ${matchingCount} overstocked product${matchingCount === 1 ? '' : 's'} identified`}
-                {stockStatusFilter === 'out_of_stock' && `Out of Stock Priority View: ${matchingCount} out-of-stock product${matchingCount === 1 ? '' : 's'} identified`}
+                {stockStatusFilter === 'low_stock' && `Low Stock Filter: Showing ${totalMatchingProducts} low-stock product${totalMatchingProducts === 1 ? '' : 's'}`}
+                {stockStatusFilter === 'overstock' && `Overstock Filter: Showing ${totalMatchingProducts} overstocked product${totalMatchingProducts === 1 ? '' : 's'}`}
+                {stockStatusFilter === 'out_of_stock' && `Out of Stock Filter: Showing ${totalMatchingProducts} out-of-stock product${totalMatchingProducts === 1 ? '' : 's'}`}
               </p>
               <p className="text-xs opacity-85">
-                {stockStatusFilter === 'low_stock' && 'Products at or below their reorder point are highlighted in amber and sent to the top of the table.'}
-                {stockStatusFilter === 'overstock' && 'Products with high inventory stock positions are highlighted in indigo and sent to the top of the table.'}
-                {stockStatusFilter === 'out_of_stock' && 'Products with 0 stock available are highlighted in red and sent to the top of the table.'}
+                {stockStatusFilter === 'low_stock' && 'Only products at or below their reorder point are displayed.'}
+                {stockStatusFilter === 'overstock' && 'Only products exceeding their standard economic order batch are displayed.'}
+                {stockStatusFilter === 'out_of_stock' && 'Only products with zero available stock are displayed.'}
               </p>
             </div>
           </div>
@@ -418,7 +439,7 @@ export default function ProductsPage() {
             variant="secondary"
             onClick={() => handleStockStatusFilterChange('all')}
           >
-            <FilterX aria-hidden="true" size={14} /> Clear filter / Reset order
+            <FilterX aria-hidden="true" size={14} /> Clear filter / Show all
           </Button>
         </div>
       )}
@@ -426,13 +447,13 @@ export default function ProductsPage() {
       {/* Counter & Status Header */}
       <div className="flex items-center justify-between text-sm text-muted">
         <p>
-          Showing {displayedProducts.length} of {productsQuery.data?.meta.total ?? rawProducts.length} {isArchivedView ? 'archived' : 'active'} products
-          {stockStatusFilter !== 'all' ? ` (${matchingCount} prioritized)` : ''}
+          Showing <strong>{displayedProducts.length}</strong> of <strong>{totalMatchingProducts}</strong> {isArchivedView ? 'archived' : 'active'} products
+          {stockStatusFilter !== 'all' ? ` (${totalMatchingProducts} filtered)` : ''}
         </p>
         <p>{productsQuery.isFetching ? 'Updating…' : 'Live catalog sync'}</p>
       </div>
 
-      {/* Product Table with Priority Sorting & Highlighting */}
+      {/* Product Table with Filtered Results */}
       <ProductTable
         isArchivedView={isArchivedView}
         products={displayedProducts}
@@ -445,13 +466,13 @@ export default function ProductsPage() {
       {/* Pagination */}
       <nav aria-label="Product pagination" className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          Page {filters.page} of {totalPages}
+          Page {currentPage} of {totalPages}
         </p>
         <div className="flex gap-2">
-          <Button disabled={filters.page <= 1} variant="secondary" onClick={() => updateFilter('page', filters.page - 1)}>
+          <Button disabled={currentPage <= 1} variant="secondary" onClick={() => updateFilter('page', currentPage - 1)}>
             Previous
           </Button>
-          <Button disabled={filters.page >= totalPages} variant="secondary" onClick={() => updateFilter('page', filters.page + 1)}>
+          <Button disabled={currentPage >= totalPages} variant="secondary" onClick={() => updateFilter('page', currentPage + 1)}>
             Next
           </Button>
         </div>

@@ -63,7 +63,7 @@ export function ProductSearchPanel({ branchId, onAdd }: ProductSearchPanelProps)
               autoFocus
               className="h-9.5 w-full rounded-xl border border-border bg-surface pl-9 pr-8 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
               id="pos-search"
-              placeholder="Search products or scan barcode..."
+              placeholder="Search products or SKU..."
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}

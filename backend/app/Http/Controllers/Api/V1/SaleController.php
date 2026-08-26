@@ -122,18 +122,27 @@ class SaleController extends Controller
             $query->where('cashier_user_id', (int) $request->query('cashierUserId'));
         }
 
-        if ($request->filled('saleNumber')) {
-            $query->where('sale_number', $request->query('saleNumber'));
+        if ($search = trim((string) $request->query('saleNumber', ''))) {
+            $query->where('sale_number', 'like', "%{$search}%");
         }
 
         if ($request->filled('from')) {
-            $query->where('sold_at', '>=', $request->query('from'));
+            $from = (string) $request->query('from');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+                $from .= ' 00:00:00';
+            }
+            $query->where('sold_at', '>=', $from);
         }
 
         if ($request->filled('to')) {
-            $query->where('sold_at', '<=', $request->query('to'));
+            $to = (string) $request->query('to');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+                $to .= ' 23:59:59';
+            }
+            $query->where('sold_at', '<=', $to);
         }
 
+        $totalSalesSum = (clone $query)->where('status', 'completed')->sum('total_amount');
         $paginator = $query->orderByDesc('sold_at')->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
@@ -143,6 +152,7 @@ class SaleController extends Controller
                 'page' => $paginator->currentPage(),
                 'perPage' => $paginator->perPage(),
                 'total' => $paginator->total(),
+                'totalSalesAmount' => (string) $totalSalesSum,
             ],
         ]);
     }

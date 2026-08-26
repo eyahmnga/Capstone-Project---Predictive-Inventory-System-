@@ -45,7 +45,7 @@ export const confirmDialogOverlayClass = 'fixed inset-0 z-50 grid place-items-ce
 
 export function confirmDialogPanelClass(sizeMax: string, className?: string): string {
   return cn(
-    'max-h-[85dvh] w-full overflow-y-auto rounded-card border border-border bg-surface p-6 shadow-panel sm:p-8',
+    'max-h-[85dvh] w-full overflow-y-auto overflow-x-hidden rounded-card border border-border bg-surface p-6 shadow-panel sm:p-8',
     sizeMax,
     className,
   )

@@ -2,6 +2,7 @@
 
 namespace App\Domains\Catalog\Services;
 
+use App\Domains\Catalog\Models\Category;
 use App\Domains\Catalog\Models\Product;
 use App\Domains\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,12 @@ class ProductService
     public function create(array $attributes, User $actor): Product
     {
         return DB::transaction(function () use ($attributes, $actor) {
-            $this->assertSkuAvailable($attributes['sku']);
+            if (empty($attributes['sku'])) {
+                $attributes['sku'] = $this->generateUniqueSku($attributes['category_id'] ?? null);
+            } else {
+                $this->assertSkuAvailable($attributes['sku']);
+            }
+
             if (! empty($attributes['barcode'])) {
                 $this->assertBarcodeAvailable($attributes['barcode']);
             }
@@ -32,7 +38,7 @@ class ProductService
         return DB::transaction(function () use ($product, $attributes, $actor) {
             $locked = Product::query()->lockForUpdate()->findOrFail($product->id);
 
-            if (array_key_exists('sku', $attributes) && $attributes['sku'] !== $locked->sku) {
+            if (array_key_exists('sku', $attributes) && ! empty($attributes['sku']) && $attributes['sku'] !== $locked->sku) {
                 $this->assertSkuAvailable($attributes['sku']);
             }
 
@@ -74,6 +80,33 @@ class ProductService
 
             return $locked;
         });
+    }
+
+    public function generateUniqueSku(?int $categoryId = null): string
+    {
+        $prefix = 'SHX';
+        $catCode = 'PRD';
+
+        if ($categoryId) {
+            $category = Category::query()->find($categoryId);
+            if ($category && $category->code) {
+                $catCode = strtoupper(substr($category->code, 0, 4));
+            } elseif ($category && $category->name) {
+                $cleaned = preg_replace('/[^A-Za-z0-9]/', '', $category->name);
+                $catCode = strtoupper(substr($cleaned ?: 'PRD', 0, 3));
+            }
+        }
+
+        $existingCount = Product::withTrashed()->where('sku', 'LIKE', "{$prefix}-{$catCode}-%")->count();
+        $counter = $existingCount + 1;
+        $candidate = sprintf('%s-%s-%03d', $prefix, $catCode, $counter);
+
+        while (Product::withTrashed()->where('sku', $candidate)->exists()) {
+            $counter++;
+            $candidate = sprintf('%s-%s-%03d', $prefix, $catCode, $counter);
+        }
+
+        return $candidate;
     }
 
     private function assertSkuAvailable(string $sku): void
