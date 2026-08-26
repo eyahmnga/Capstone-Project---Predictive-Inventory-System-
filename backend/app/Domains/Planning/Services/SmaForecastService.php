@@ -74,8 +74,8 @@ class SmaForecastService
             throw new PlanningException('INVALID_DATE_RANGE', 422, 'The history end date must not be before the start date.');
         }
 
-        if ($historyEnd->gte($today)) {
-            throw new PlanningException('INVALID_DATE_RANGE', 422, 'The history end date must fall before the current, still-incomplete period.');
+        if ($historyEnd->gt($today)) {
+            throw new PlanningException('INVALID_DATE_RANGE', 422, 'The history end date cannot be in the future.');
         }
 
         // Carbon 3's diffInDays() returns a signed float by default (unlike

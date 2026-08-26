@@ -33,9 +33,7 @@ export function computeHistoryStartDate(periodGrain: PeriodGrain, windowPeriods:
   return `${startYear}-${startMonth}-${startDay}`
 }
 
-/** Yesterday in the browser's local calendar — matches an HTML date input's local-date semantics. */
+/** Today in the browser's local calendar — matches an HTML date input's local-date semantics. */
 export function defaultHistoryEndDate(): string {
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  return formatLocalDate(yesterday)
+  return formatLocalDate(new Date())
 }

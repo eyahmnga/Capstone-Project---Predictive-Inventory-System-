@@ -1,13 +1,34 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, Calculator, CheckCircle2, History, PlayCircle, Sparkles, TrendingUp } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ArrowRight,
+  Calculator,
+  CheckCircle2,
+  Filter,
+  History,
+  PlayCircle,
+  RefreshCw,
+  Search,
+  Sparkles,
+  TrendingUp,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { createForecastRun, forecastQueryKeys, getForecastRun, recordManualPlan } from '@/features/forecasting/api/forecastApi'
+import {
+  createForecastRun,
+  forecastQueryKeys,
+  getForecastRun,
+  recordManualPlan,
+} from '@/features/forecasting/api/forecastApi'
 import { ForecastRunDetailsDrawer } from '@/features/forecasting/components/ForecastRunDetailsDrawer'
 import { ForecastRunFormDialog } from '@/features/forecasting/components/ForecastRunFormDialog'
 import { useForecastRuns } from '@/features/forecasting/hooks/useForecast'
-import type { CreateForecastRunPayload, ForecastRunFilters, ForecastRunItem } from '@/features/forecasting/types/forecast'
+import { computeHistoryStartDate, defaultHistoryEndDate } from '@/features/forecasting/lib/period'
+import type {
+  CreateForecastRunPayload,
+  ForecastRunFilters,
+  ForecastRunItem,
+} from '@/features/forecasting/types/forecast'
 import { type ApiError } from '@/shared/api/client'
 import { Button } from '@/shared/components/Button'
 import { PageHeader } from '@/shared/components/PageHeader'
@@ -20,6 +41,7 @@ export default function ForecastingPage() {
   const [filters, setFilters] = useState<ForecastRunFilters>(defaultFilters)
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const queryClient = useQueryClient()
 
   const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
@@ -55,7 +77,17 @@ export default function ForecastingPage() {
   })
 
   const manualPlanMutation = useMutation({
-    mutationFn: ({ item, manualQuantity, reason, expiresAt }: { item: ForecastRunItem; manualQuantity: string; reason: string; expiresAt: string }) =>
+    mutationFn: ({
+      item,
+      manualQuantity,
+      reason,
+      expiresAt,
+    }: {
+      item: ForecastRunItem
+      manualQuantity: string
+      reason: string
+      expiresAt: string
+    }) =>
       recordManualPlan(activeRunId as string, item.productId, manualQuantity, reason, expiresAt),
     onSuccess: invalidate,
   })
@@ -64,18 +96,68 @@ export default function ForecastingPage() {
   const branchId = filters.branchId
   const activeItems = activeRunQuery.data?.items ?? []
 
+  // Quick 1-click forecast run with 14-day history ending today
+  const handleQuickRun = () => {
+    if (!branchId) return
+    const endDate = defaultHistoryEndDate()
+    const startDate = computeHistoryStartDate('daily', 14, endDate)
+    createMutation.mutate({
+      periodGrain: 'daily',
+      windowPeriods: 14,
+      historyStartDate: startDate,
+      historyEndDate: endDate,
+    })
+  }
+
+  // Sort active demand items to the top, and filter by search
+  const displayedItems = useMemo(() => {
+    let list = [...activeItems]
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter(
+        (item) =>
+          item.productName?.toLowerCase().includes(q) ||
+          item.productSku?.toLowerCase().includes(q),
+      )
+    }
+
+    return list.sort((a, b) => {
+      const aDemand = Number(a.demandTotal) || 0
+      const bDemand = Number(b.demandTotal) || 0
+      return bDemand - aDemand
+    })
+  }, [activeItems, searchQuery])
+
+  const activeDemandCount = activeItems.filter((i) => (Number(i.demandTotal) || 0) > 0).length
+
   return (
     <div className="space-y-6">
       <PageHeader
         actions={
           hasPermission('forecasting.run') ? (
-            <Button disabled={!branchId || createMutation.isPending} onClick={() => setIsFormOpen(true)}>
-              <PlayCircle aria-hidden="true" size={18} />
-              {createMutation.isPending ? 'Calculating…' : 'Run SMA Forecast'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                disabled={!branchId || createMutation.isPending}
+                variant="secondary"
+                onClick={handleQuickRun}
+                className="text-xs font-semibold"
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  size={15}
+                  className={createMutation.isPending ? 'animate-spin text-blue-600' : ''}
+                />
+                Quick 14-Day Recalculate
+              </Button>
+              <Button disabled={!branchId || createMutation.isPending} onClick={() => setIsFormOpen(true)}>
+                <PlayCircle aria-hidden="true" size={18} />
+                {createMutation.isPending ? 'Calculating…' : 'Custom SMA Run'}
+              </Button>
+            </div>
           ) : undefined
         }
-        description="Predicts future customer demand per day and month using the 14-Day Simple Moving Average (SMA)."
+        description="Predicts future customer demand per day and month using Simple Moving Average (SMA) over completed POS transactions."
         title="Demand Forecast (SMA)"
       />
 
@@ -98,7 +180,7 @@ export default function ForecastingPage() {
             Simple Moving Average
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            Takes your total sales over 14 days and calculates how many units sell <strong>per day</strong>.
+            Takes your total sales over rolling days and calculates how many units sell <strong>per day</strong>.
           </p>
         </div>
 
@@ -107,13 +189,13 @@ export default function ForecastingPage() {
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 font-bold text-xs">
               2
             </span>
-            <span className="text-xs font-semibold text-slate-500">Active Window</span>
+            <span className="text-xs font-semibold text-slate-500">Active Demand</span>
           </div>
           <p className="mt-2 text-sm font-bold text-emerald-700">
-            14-Day Rolling History
+            {activeDemandCount} Items with Live Sales
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
-            Daily Forecast = Total Units Sold &divide; 14 Days
+            Daily Forecast = Total Units Sold &divide; Number of Days
           </p>
         </div>
 
@@ -143,12 +225,19 @@ export default function ForecastingPage() {
 
       {/* Main Direct Products Demand Forecast Table */}
       <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-slate-100 bg-slate-50/50">
           <div>
-            <h2 className="text-sm font-bold text-slate-800">
-              📊 Product Demand Rates (SMA Results)
-            </h2>
-            <p className="text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-800">
+                📊 Product Demand Rates (SMA Results)
+              </h2>
+              {activeRunQuery.data && (
+                <span className="rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-bold">
+                  Run #{activeRunQuery.data.id} ({activeRunQuery.data.historyStartDate} to {activeRunQuery.data.historyEndDate})
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
               Straightforward daily selling speed and 30-day projected requirements for each product
             </p>
           </div>
@@ -165,12 +254,29 @@ export default function ForecastingPage() {
           </div>
         </div>
 
-        {activeItems.length === 0 ? (
+        {/* Search Bar */}
+        <div className="p-3 border-b border-slate-100 bg-white">
+          <div className="relative">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
+            <input
+              className="h-9 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-xs outline-none placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+              placeholder="Search products in forecast..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {displayedItems.length === 0 ? (
           <div className="p-8 text-center">
             <TrendingUp className="mx-auto text-slate-300 mb-2" size={32} />
-            <p className="text-sm font-semibold text-slate-700">No active forecast run found</p>
+            <p className="text-sm font-semibold text-slate-700">No active forecast records</p>
             <p className="text-xs text-slate-500 mt-1">
-              Click &quot;Run SMA Forecast&quot; to calculate daily demand across your catalog.
+              Click &quot;Quick 14-Day Recalculate&quot; to compute daily demand across all completed POS sales.
             </p>
           </div>
         ) : (
@@ -179,7 +285,7 @@ export default function ForecastingPage() {
               <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200/80">
                 <tr>
                   <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3 text-right">Sold in 14 Days</th>
+                  <th className="px-4 py-3 text-right">Historical Sold</th>
                   <th className="px-4 py-3 text-right">SMA Daily Demand</th>
                   <th className="px-4 py-3 text-right">Estimated 30-Day Demand</th>
                   <th className="px-4 py-3 text-center">Status</th>
@@ -187,12 +293,17 @@ export default function ForecastingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {activeItems.map((item) => {
-                  const dailyRate = Number(item.coldStartStatus === 'manual_override' ? item.manualQuantity : item.forecastQuantity) || 0
+                {displayedItems.map((item) => {
+                  const dailyRate =
+                    Number(item.coldStartStatus === 'manual_override' ? item.manualQuantity : item.forecastQuantity) || 0
                   const monthlyRate = Math.round(dailyRate * 30)
+                  const hasSales = (Number(item.demandTotal) || 0) > 0
 
                   return (
-                    <tr key={item.productId} className="hover:bg-slate-50/70 transition">
+                    <tr
+                      key={item.productId}
+                      className={`transition ${hasSales ? 'bg-emerald-50/20 font-medium hover:bg-emerald-50/40' : 'hover:bg-slate-50/70'}`}
+                    >
                       <td className="px-4 py-3">
                         <p className="font-bold text-slate-800">{item.productName}</p>
                         <p className="font-mono text-xs text-slate-400">{item.productSku}</p>
@@ -214,11 +325,11 @@ export default function ForecastingPage() {
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
                             dailyRate > 0
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
                         >
-                          {dailyRate > 0 ? '✓ Active Demand' : 'No Sales Yet'}
+                          {dailyRate > 0 ? '✓ Active Demand' : 'No Sales In Period'}
                         </span>
                       </td>
 
