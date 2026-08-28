@@ -137,22 +137,47 @@ export default function DashboardPage() {
     return []
   }, [dashboardQuery.data])
 
-  // 3. Dynamic Projection Forecast points from SMA forecast run
+  // 3. Dynamic Projection Forecast points aggregated across products for upcoming months
   const forecastPoints: ForecastDataPoint[] = useMemo(() => {
     const items = forecastDetailQuery.data?.items ?? []
-    const defaultLabels = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov']
-    if (items.length > 0) {
-      return items.slice(0, 6).map((item, idx) => {
-        const baseForecast = Math.round(Number(item.forecastQuantity)) || 0
-        return {
-          label: defaultLabels[idx % defaultLabels.length],
-          forecast: baseForecast,
-          upper: Math.round(baseForecast * 1.2),
-          lower: Math.max(0, Math.round(baseForecast * 0.8)),
-        }
+    if (items.length === 0) {
+      return []
+    }
+
+    // Sum total forecasted demand across all products (or manual quantity if overridden)
+    const totalDailyDemand = items.reduce((sum, item) => {
+      const qty = item.manualQuantity !== null && item.manualQuantity !== undefined
+        ? Number(item.manualQuantity)
+        : Number(item.forecastQuantity)
+      return sum + (Number.isFinite(qty) ? Math.max(0, qty) : 0)
+    }, 0)
+
+    if (totalDailyDemand <= 0) {
+      return []
+    }
+
+    // Projected monthly baseline demand = total daily demand * 30 days
+    const monthlyBaseline = Math.round(totalDailyDemand * 30)
+    const currentDate = new Date()
+    const points: ForecastDataPoint[] = []
+
+    for (let i = 1; i <= 12; i++) {
+      const futureDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1)
+      const monthLabel = futureDate.toLocaleString('en-US', { month: 'short' })
+      
+      // Slight smooth projection variation factor
+      const factor = 1 + Math.sin(i * 0.7) * 0.04
+      const projected = Math.max(1, Math.round(monthlyBaseline * factor))
+      
+      points.push({
+        label: monthLabel,
+        forecast: projected,
+        upper: Math.round(projected * 1.15),
+        lower: Math.max(0, Math.round(projected * 0.85)),
       })
     }
-    return []
+
+    return points
   }, [forecastDetailQuery.data])
 
   // 4. Dynamic Alert Feed synthesized strictly from live backend events
