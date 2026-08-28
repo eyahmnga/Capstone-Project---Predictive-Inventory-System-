@@ -40,17 +40,14 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * @return array{manager: User, staffOne: User, staffTwo: User}
+     * @return array{manager: User}
      */
     private function seedDemoUsers(Branch $branch): array
     {
         $managerRole = Role::query()->where('code', 'manager')->firstOrFail();
-        $staffRole = Role::query()->where('code', 'staff')->firstOrFail();
 
         return [
-            'manager' => $this->seedUser('marco.villareal@stevenhydrotech.example', 'Marco', 'Villareal', $managerRole, $branch),
-            'staffOne' => $this->seedUser('grace.dizon@stevenhydrotech.example', 'Grace', 'Dizon', $staffRole, $branch),
-            'staffTwo' => $this->seedUser('paolo.reyes@stevenhydrotech.example', 'Paolo', 'Reyes', $staffRole, $branch),
+            'manager' => $this->seedUser('manager@stevenhydrotech.example', 'Elmer', 'Ella', $managerRole, $branch),
         ];
     }
 

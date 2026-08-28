@@ -9,9 +9,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Seeds the first Owner account for local development and CI only.
- * Production environments must provision the initial Owner through an
- * approved out-of-band process, never this seeder.
+ * Seeds the official Owner account.
  */
 class OwnerUserSeeder extends Seeder
 {
@@ -22,15 +20,15 @@ class OwnerUserSeeder extends Seeder
         }
 
         $email = env('OWNER_SEED_EMAIL', 'owner@stevenhydrotech.example');
-        $password = env('OWNER_SEED_PASSWORD', 'ChangeMe!12345');
-        $displayName = 'Ella Mañaga';
+        $password = env('OWNER_SEED_PASSWORD', 'password123');
+        $displayName = 'Steven Kristoffer Destura';
 
         $user = User::query()->updateOrCreate(
             ['email' => $email],
             [
                 'password_hash' => Hash::make($password),
-                'first_name' => 'Ella',
-                'last_name' => 'Mañaga',
+                'first_name' => 'Steven Kristoffer',
+                'last_name' => 'Destura',
                 'display_name' => $displayName,
                 'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed='.urlencode($displayName),
                 'is_active' => true,

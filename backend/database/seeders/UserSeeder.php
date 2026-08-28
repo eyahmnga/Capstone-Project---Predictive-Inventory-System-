@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * Seeds the standard system users (Owner, Manager, Staff) for local development and CI.
+ * Seeds the 3 official system users (Owner, Admin, Manager).
  */
 class UserSeeder extends Seeder
 {
@@ -20,21 +20,18 @@ class UserSeeder extends Seeder
         }
 
         $mainBranch = Branch::query()->where('code', 'MAIN')->first();
-
-        // 1. Owner Account
         $ownerRole = Role::query()->where('code', 'owner')->firstOrFail();
-        $ownerEmail = env('OWNER_SEED_EMAIL', 'owner@stevenhydrotech.example');
-        $ownerPassword = env('OWNER_SEED_PASSWORD', 'ChangeMe!12345');
-        $ownerDisplayName = 'Ella Mañaga';
+        $managerRole = Role::query()->where('code', 'manager')->firstOrFail();
 
+        // 1. Owner: Steven Kristoffer Destura
         $owner = User::query()->updateOrCreate(
-            ['email' => $ownerEmail],
+            ['email' => 'owner@stevenhydrotech.example'],
             [
-                'password_hash' => Hash::make($ownerPassword),
-                'first_name' => 'Ella',
-                'last_name' => 'Mañaga',
-                'display_name' => $ownerDisplayName,
-                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed='.urlencode($ownerDisplayName),
+                'password_hash' => Hash::make('password123'),
+                'first_name' => 'Steven Kristoffer',
+                'last_name' => 'Destura',
+                'display_name' => 'Steven Kristoffer Destura',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Steven+Kristoffer+Destura',
                 'is_active' => true,
                 'email_verified_at' => now(),
             ],
@@ -50,76 +47,52 @@ class UserSeeder extends Seeder
             ]);
         }
 
-        // Also alias admin@stevenhydrotech.com for convenience
+        // 2. Admin: Danica Olario Cardel
         $admin = User::query()->updateOrCreate(
             ['email' => 'admin@stevenhydrotech.com'],
             [
                 'password_hash' => Hash::make('password123'),
-                'first_name' => 'Admin',
-                'last_name' => 'User',
-                'display_name' => 'Administrator',
-                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Admin',
+                'first_name' => 'Danica',
+                'last_name' => 'Olario Cardel',
+                'display_name' => 'Danica Olario Cardel',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Danica+Olario+Cardel',
                 'is_active' => true,
                 'email_verified_at' => now(),
             ],
         );
+
         $admin->roles()->syncWithoutDetaching([
             $ownerRole->id => ['effective_from' => now(), 'created_at' => now()],
         ]);
+
         if ($mainBranch) {
             $admin->branches()->syncWithoutDetaching([
                 $mainBranch->id => ['is_default' => true, 'created_at' => now()],
             ]);
         }
 
-        // 2. Manager Account
-        $managerRole = Role::query()->where('code', 'manager')->first();
-        if ($managerRole) {
-            $manager = User::query()->updateOrCreate(
-                ['email' => 'manager@stevenhydrotech.example'],
-                [
-                    'password_hash' => Hash::make('ChangeMe!12345'),
-                    'first_name' => 'Marco',
-                    'last_name' => 'Santos',
-                    'display_name' => 'Marco Santos',
-                    'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Marco+Santos',
-                    'is_active' => true,
-                    'email_verified_at' => now(),
-                ],
-            );
-            $manager->roles()->syncWithoutDetaching([
-                $managerRole->id => ['effective_from' => now(), 'created_at' => now()],
-            ]);
-            if ($mainBranch) {
-                $manager->branches()->syncWithoutDetaching([
-                    $mainBranch->id => ['is_default' => true, 'created_at' => now()],
-                ]);
-            }
-        }
+        // 3. Manager: Elmer Ella
+        $manager = User::query()->updateOrCreate(
+            ['email' => 'manager@stevenhydrotech.example'],
+            [
+                'password_hash' => Hash::make('password123'),
+                'first_name' => 'Elmer',
+                'last_name' => 'Ella',
+                'display_name' => 'Elmer Ella',
+                'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Elmer+Ella',
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ],
+        );
 
-        // 3. Staff Account
-        $staffRole = Role::query()->where('code', 'staff')->first();
-        if ($staffRole) {
-            $staff = User::query()->updateOrCreate(
-                ['email' => 'staff@stevenhydrotech.example'],
-                [
-                    'password_hash' => Hash::make('ChangeMe!12345'),
-                    'first_name' => 'Grace',
-                    'last_name' => 'Dizon',
-                    'display_name' => 'Grace Dizon',
-                    'avatar_url' => 'https://api.dicebear.com/7.x/initials/svg?seed=Grace+Dizon',
-                    'is_active' => true,
-                    'email_verified_at' => now(),
-                ],
-            );
-            $staff->roles()->syncWithoutDetaching([
-                $staffRole->id => ['effective_from' => now(), 'created_at' => now()],
+        $manager->roles()->syncWithoutDetaching([
+            $managerRole->id => ['effective_from' => now(), 'created_at' => now()],
+        ]);
+
+        if ($mainBranch) {
+            $manager->branches()->syncWithoutDetaching([
+                $mainBranch->id => ['is_default' => true, 'created_at' => now()],
             ]);
-            if ($mainBranch) {
-                $staff->branches()->syncWithoutDetaching([
-                    $mainBranch->id => ['is_default' => true, 'created_at' => now()],
-                ]);
-            }
         }
     }
 }
