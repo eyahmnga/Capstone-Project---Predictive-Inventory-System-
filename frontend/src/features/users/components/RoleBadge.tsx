@@ -6,6 +6,7 @@ import { Badge } from '@/shared/components/Badge'
 // consistent shape, padding, and typography.
 const roleClasses: Record<string, string> = {
   owner: 'bg-violet-50 text-violet-700',
+  admin: 'bg-indigo-50 text-indigo-700',
   manager: 'bg-brand-50 text-brand-700',
   staff: 'bg-subtle text-muted',
 }

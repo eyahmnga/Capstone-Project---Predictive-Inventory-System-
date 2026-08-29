@@ -21,9 +21,13 @@ class UpdateSystemUsersCommand extends Command
 
         $mainBranch = Branch::query()->where('code', 'MAIN')->first() ?? Branch::query()->first();
         $ownerRole = Role::query()->where('code', 'owner')->firstOrFail();
+        $adminRole = Role::query()->updateOrCreate(
+            ['code' => 'admin'],
+            ['name' => 'Admin', 'description' => 'Full administrative oversight, identity governance, catalog, procurement, and system configuration.', 'is_system_role' => true]
+        );
         $managerRole = Role::query()->where('code', 'manager')->firstOrFail();
 
-        DB::transaction(function () use ($mainBranch, $ownerRole, $managerRole) {
+        DB::transaction(function () use ($mainBranch, $ownerRole, $adminRole, $managerRole) {
             // 1. Owner: Steven Kristoffer Destura
             $owner = User::query()->where('id', 1)->first()
                 ?? User::query()->where('email', 'owner@stevenhydrotech.example')->first()
@@ -69,7 +73,7 @@ class UpdateSystemUsersCommand extends Command
             $admin->save();
 
             $admin->roles()->sync([
-                $ownerRole->id => ['effective_from' => now(), 'created_at' => now()],
+                $adminRole->id => ['effective_from' => now(), 'created_at' => now()],
             ]);
 
             if ($mainBranch) {

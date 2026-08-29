@@ -21,6 +21,7 @@ class UserSeeder extends Seeder
 
         $mainBranch = Branch::query()->where('code', 'MAIN')->first();
         $ownerRole = Role::query()->where('code', 'owner')->firstOrFail();
+        $adminRole = Role::query()->where('code', 'admin')->firstOrFail();
         $managerRole = Role::query()->where('code', 'manager')->firstOrFail();
 
         // 1. Owner: Steven Kristoffer Destura
@@ -37,7 +38,7 @@ class UserSeeder extends Seeder
             ],
         );
 
-        $owner->roles()->syncWithoutDetaching([
+        $owner->roles()->sync([
             $ownerRole->id => ['effective_from' => now(), 'created_at' => now()],
         ]);
 
@@ -61,8 +62,8 @@ class UserSeeder extends Seeder
             ],
         );
 
-        $admin->roles()->syncWithoutDetaching([
-            $ownerRole->id => ['effective_from' => now(), 'created_at' => now()],
+        $admin->roles()->sync([
+            $adminRole->id => ['effective_from' => now(), 'created_at' => now()],
         ]);
 
         if ($mainBranch) {
@@ -85,7 +86,7 @@ class UserSeeder extends Seeder
             ],
         );
 
-        $manager->roles()->syncWithoutDetaching([
+        $manager->roles()->sync([
             $managerRole->id => ['effective_from' => now(), 'created_at' => now()],
         ]);
 

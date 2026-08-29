@@ -9,6 +9,7 @@ class RoleSeeder extends Seeder
 {
     public const ROLES = [
         ['code' => 'owner', 'name' => 'Owner', 'description' => 'Strategic visibility and full governance controls.', 'is_system_role' => true],
+        ['code' => 'admin', 'name' => 'Admin', 'description' => 'Full administrative oversight, identity governance, catalog, procurement, and system configuration.', 'is_system_role' => true],
         ['code' => 'manager', 'name' => 'Manager', 'description' => 'Operational oversight, approvals, and procurement control.', 'is_system_role' => true],
         ['code' => 'staff', 'name' => 'Staff', 'description' => 'Least-privilege access to assigned operational workflows.', 'is_system_role' => true],
     ];
