@@ -76,12 +76,6 @@ class UpdateSystemUsersCommand extends Command
                 $adminRole->id => ['effective_from' => now(), 'created_at' => now()],
             ]);
 
-            if ($mainBranch) {
-                $admin->branches()->sync([
-                    $mainBranch->id => ['is_default' => true, 'created_at' => now()],
-                ]);
-            }
-
             // 3. Manager: Elmer Ella
             $manager = User::query()->where('id', 3)->first()
                 ?? User::query()->where('email', 'manager@stevenhydrotech.example')->first()
@@ -103,11 +97,12 @@ class UpdateSystemUsersCommand extends Command
                 $managerRole->id => ['effective_from' => now(), 'created_at' => now()],
             ]);
 
-            if ($mainBranch) {
-                $manager->branches()->sync([
-                    $mainBranch->id => ['is_default' => true, 'created_at' => now()],
-                ]);
-            }
+            $allBranches = Branch::query()->get();
+            $branchSyncData = $allBranches->mapWithKeys(fn ($b) => [$b->id => ['is_default' => ($b->code === 'MAIN'), 'created_at' => now()]])->all();
+
+            $owner->branches()->sync($branchSyncData);
+            $admin->branches()->sync($branchSyncData);
+            $manager->branches()->sync($branchSyncData);
 
             $keptIds = [$owner->id, $admin->id, $manager->id];
 

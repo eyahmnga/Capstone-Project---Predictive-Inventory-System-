@@ -1,4 +1,4 @@
-import { Calculator, Edit3, PanelRightOpen } from 'lucide-react'
+import { Building2, Calculator, Edit3, MapPin, Warehouse } from 'lucide-react'
 import type { ReorderPolicy } from '@/features/restocking/types/restocking'
 import { Button } from '@/shared/components/Button'
 import { RecordCard } from '@/shared/components/RecordCard'
@@ -10,6 +10,24 @@ const stateBadge = (isActive: boolean) => (
     {isActive ? '● Active Policy' : 'Inactive'}
   </span>
 )
+
+function DestinationBadge({ name, code }: { name?: string | null; code?: string | null }) {
+  const displayName = name || (code === 'BUD-WH' ? 'Budiao Warehouse' : 'Legazpi Branch')
+  const isWarehouse = displayName.toLowerCase().includes('warehouse') || code === 'BUD-WH'
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
+        isWarehouse
+          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+          : 'bg-blue-50 text-blue-800 border border-blue-200'
+      }`}
+    >
+      {isWarehouse ? <Warehouse size={12} className="text-amber-600" /> : <Building2 size={12} className="text-blue-600" />}
+      {displayName}
+    </span>
+  )
+}
 
 export function ReorderPolicyTable({
   policies,
@@ -34,6 +52,7 @@ export function ReorderPolicyTable({
               title={policy.productName ?? '—'}
               subtitle={<span className="font-mono">{policy.productSku}</span>}
               fields={[
+                { label: 'Delivery destination', value: <DestinationBadge code={policy.branchCode} name={policy.branchName} />, full: true },
                 { label: 'Safety stock', value: `${formatQuantity(policy.safetyStockQuantity)} pcs` },
                 { label: 'Lead time', value: `${policy.leadTimeDaysOverride ?? '—'} days` },
                 { label: 'Reorder trigger point (ROP)', value: policy.reorderPointQuantity ? `Trigger at ≤ ${formatQuantity(policy.reorderPointQuantity)} pcs` : 'Not calculated', full: true },
@@ -57,11 +76,12 @@ export function ReorderPolicyTable({
       </div>
 
       <div className="hidden md:block">
-        <Table minWidth={800}>
+        <Table minWidth={850}>
           <TableHead>
             <tr>
               <TableHeaderCell>Product & Supplier</TableHeaderCell>
-              <TableHeaderCell align="right">Safety Stock (Buffer)</TableHeaderCell>
+              <TableHeaderCell>Delivery Destination</TableHeaderCell>
+              <TableHeaderCell align="right">Safety Stock</TableHeaderCell>
               <TableHeaderCell align="right">Lead Time</TableHeaderCell>
               <TableHeaderCell align="right">Reorder Point (ROP)</TableHeaderCell>
               <TableHeaderCell>Policy Status</TableHeaderCell>
@@ -70,7 +90,7 @@ export function ReorderPolicyTable({
           </TableHead>
           <TableBody>
             {policies.length === 0 ? (
-              <TableEmptyState colSpan={6}>No reorder policies match these filters.</TableEmptyState>
+              <TableEmptyState colSpan={7}>No reorder policies match these filters.</TableEmptyState>
             ) : (
               policies.map((policy) => (
                 <TableRow key={policy.id} className="hover:bg-slate-50/70 transition">
@@ -80,6 +100,9 @@ export function ReorderPolicyTable({
                     {policy.preferredSupplierName ? (
                       <p className="text-[11px] text-slate-400 mt-0.5">Supplier: {policy.preferredSupplierName}</p>
                     ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <DestinationBadge code={policy.branchCode} name={policy.branchName} />
                   </TableCell>
                   <TableCell align="right" className="font-mono tabular-nums text-slate-700">
                     {formatQuantity(policy.safetyStockQuantity)} pcs

@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { ArrowRight, Calculator, Info, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Building2, Calculator, Info, MapPin, RefreshCw, ShoppingCart, Sparkles, Warehouse, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEoqHistory } from '@/features/restocking/hooks/useRestocking'
 import type { ReorderPolicy } from '@/features/restocking/types/restocking'
@@ -40,6 +40,8 @@ export function ReorderPolicyDetailsDrawer({
   }
 
   const latestEoq = eoqHistoryQuery.data && eoqHistoryQuery.data.length > 0 ? eoqHistoryQuery.data[0] : null
+  const destinationName = policy.branchName || (policy.branchCode === 'BUD-WH' ? 'Budiao Warehouse' : 'Legazpi Branch')
+  const isWarehouse = destinationName.toLowerCase().includes('warehouse') || policy.branchCode === 'BUD-WH'
 
   return (
     <Portal>
@@ -82,6 +84,33 @@ export function ReorderPolicyDetailsDrawer({
           </header>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+            {/* Delivery Destination Badge & Details Card */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    isWarehouse ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  {isWarehouse ? <Warehouse size={20} /> : <Building2 size={20} />}
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Delivery Destination / Receiving Location
+                  </p>
+                  <p className="text-sm font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
+                    {destinationName}
+                    <span className="text-xs font-normal text-slate-500">
+                      ({isWarehouse ? 'Budiao, Daraga, Albay' : 'Legazpi City, Albay'})
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <span className="shrink-0 rounded-md bg-white border border-slate-200 px-2 py-1 text-[11px] font-mono text-slate-600 font-bold">
+                {policy.branchCode ?? 'MAIN'}
+              </span>
+            </div>
+
             {/* Section 1: Reorder Point (ROP) - WHEN TO BUY */}
             <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -158,12 +187,12 @@ export function ReorderPolicyDetailsDrawer({
                         {formatQuantity(latestEoq.recommendedOrderQuantity)} units / order
                       </p>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Calculated at: {latestEoq.calculatedAt ? new Date(latestEoq.calculatedAt).toLocaleDateString() : 'Recent'}
+                        Destination: <strong className="text-slate-700">{destinationName}</strong>
                       </p>
                     </div>
 
                     <Link
-                      to={`/purchase-orders?newPo=1&productId=${policy.productId}&quantity=${latestEoq.recommendedOrderQuantity}&supplierId=${policy.preferredSupplierId ?? ''}`}
+                      to={`/purchase-orders?newPo=1&branchId=${policy.branchId}&productId=${policy.productId}&quantity=${latestEoq.recommendedOrderQuantity}&supplierId=${policy.preferredSupplierId ?? ''}`}
                       onClick={onClose}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition shrink-0"
                     >

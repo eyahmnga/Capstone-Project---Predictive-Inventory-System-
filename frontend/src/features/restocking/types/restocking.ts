@@ -5,6 +5,8 @@ export type LeadTimeBasis = 'supplier' | 'product_default' | 'override'
 export type ReorderPolicy = {
   id: string
   branchId: string
+  branchName?: string | null
+  branchCode?: string | null
   productId: string
   productSku: string | null
   productName: string | null
@@ -83,6 +85,7 @@ export type RestockingAlert = {
   id: string
   reorderPolicyId: string
   branchId: string | null
+  branchName?: string | null
   productId: string | null
   productSku: string | null
   productName: string | null

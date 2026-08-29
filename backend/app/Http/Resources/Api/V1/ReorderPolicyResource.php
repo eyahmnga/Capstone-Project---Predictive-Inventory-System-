@@ -18,6 +18,8 @@ class ReorderPolicyResource extends JsonResource
         return [
             'id' => (string) $policy->id,
             'branchId' => (string) $policy->branch_id,
+            'branchName' => $policy->relationLoaded('branch') && $policy->branch ? $policy->branch->name : ($policy->branch?->name ?? null),
+            'branchCode' => $policy->relationLoaded('branch') && $policy->branch ? $policy->branch->code : ($policy->branch?->code ?? null),
             'productId' => (string) $policy->product_id,
             'productSku' => $policy->relationLoaded('product') && $policy->product ? $policy->product->sku : null,
             'productName' => $policy->relationLoaded('product') && $policy->product ? $policy->product->name : null,

@@ -47,9 +47,14 @@ export default function PurchaseOrdersPage() {
   // Auto-open modal if navigated from EOQ or Restock Alert
   useEffect(() => {
     const isNewPo = searchParams.get('newPo') === '1'
+    const branchIdParam = searchParams.get('branchId')
     const productId = searchParams.get('productId')
     const quantity = searchParams.get('quantity')
     const supplierId = searchParams.get('supplierId')
+
+    if (branchIdParam && branchIdParam !== filters.branchId) {
+      setFilters((state) => ({ ...state, branchId: branchIdParam }))
+    }
 
     if (isNewPo || productId) {
       setInitialFormValues({
@@ -88,6 +93,7 @@ export default function PurchaseOrdersPage() {
     setInitialFormValues(undefined)
     if (searchParams.get('newPo') || searchParams.get('productId')) {
       searchParams.delete('newPo')
+      searchParams.delete('branchId')
       searchParams.delete('productId')
       searchParams.delete('quantity')
       searchParams.delete('supplierId')

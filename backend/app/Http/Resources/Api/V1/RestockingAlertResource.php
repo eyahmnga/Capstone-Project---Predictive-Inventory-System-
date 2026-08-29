@@ -20,6 +20,7 @@ class RestockingAlertResource extends JsonResource
             'id' => (string) $alert->id,
             'reorderPolicyId' => (string) $alert->reorder_policy_id,
             'branchId' => $policy ? (string) $policy->branch_id : null,
+            'branchName' => $policy && $policy->relationLoaded('branch') && $policy->branch ? $policy->branch->name : ($policy?->branch?->name ?? null),
             'productId' => $policy ? (string) $policy->product_id : null,
             'productSku' => $policy && $policy->relationLoaded('product') && $policy->product ? $policy->product->sku : null,
             'productName' => $policy && $policy->relationLoaded('product') && $policy->product ? $policy->product->name : null,

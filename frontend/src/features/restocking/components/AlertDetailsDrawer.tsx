@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Info, ShoppingCart, X } from 'lucide-react'
+import { ArrowRight, Building2, Info, ShoppingCart, Warehouse, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { AlertStatusBadge } from '@/features/restocking/components/AlertStatusBadge'
@@ -31,6 +31,9 @@ export function AlertDetailsDrawer({ alert, isActing, onClose, onAcknowledge, on
   const reorderPoint = Number(alert.reorderPointSnapshot) || 0
   const isBelowRop = availableStock <= reorderPoint
 
+  const destinationName = alert.branchName || 'Legazpi Branch'
+  const isWarehouse = destinationName.toLowerCase().includes('warehouse')
+
   return (
     <Portal>
       <div className={drawerOverlayClass} role="presentation" onMouseDown={onClose}>
@@ -59,6 +62,25 @@ export function AlertDetailsDrawer({ alert, isActing, onClose, onAcknowledge, on
           </header>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
+            {/* Delivery Destination Badge */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center gap-3">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                  isWarehouse ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {isWarehouse ? <Warehouse size={18} /> : <Building2 size={18} />}
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Target Destination / Receiving Facility
+                </p>
+                <p className="text-xs font-bold text-slate-900">
+                  {destinationName} {isWarehouse ? '(Budiao, Daraga, Albay)' : '(Legazpi City, Albay)'}
+                </p>
+              </div>
+            </div>
+
             {/* Actionable Reorder Recommendation Banner */}
             <div className={`rounded-xl border p-4 text-xs ${isBelowRop ? 'border-amber-200 bg-amber-50/80 text-amber-950' : 'border-slate-200 bg-slate-50 text-slate-800'}`}>
               <div className="flex items-start gap-2.5">
@@ -78,7 +100,7 @@ export function AlertDetailsDrawer({ alert, isActing, onClose, onAcknowledge, on
                       </p>
                     </div>
                     <Link
-                      to={`/purchase-orders?newPo=1&productId=${alert.productId}&quantity=${alert.recommendedOrderQuantity ?? ''}`}
+                      to={`/purchase-orders?newPo=1&branchId=${alert.branchId ?? ''}&productId=${alert.productId ?? ''}&quantity=${alert.recommendedOrderQuantity ?? ''}`}
                       onClick={onClose}
                       className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
                     >
