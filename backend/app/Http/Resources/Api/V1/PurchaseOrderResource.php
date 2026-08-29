@@ -18,6 +18,19 @@ class PurchaseOrderResource extends JsonResource
         return [
             'id' => (string) $po->id,
             'branchId' => (string) $po->branch_id,
+            'branch' => $po->relationLoaded('branch') && $po->branch ? [
+                'id' => (string) $po->branch->id,
+                'code' => $po->branch->code,
+                'name' => $po->branch->name,
+                'city' => $po->branch->city,
+                'province' => $po->branch->province,
+            ] : ($po->branch ? [
+                'id' => (string) $po->branch->id,
+                'code' => $po->branch->code,
+                'name' => $po->branch->name,
+                'city' => $po->branch->city,
+                'province' => $po->branch->province,
+            ] : null),
             'supplier' => $po->relationLoaded('supplier') && $po->supplier ? [
                 'id' => (string) $po->supplier->id,
                 'code' => $po->supplier->code,

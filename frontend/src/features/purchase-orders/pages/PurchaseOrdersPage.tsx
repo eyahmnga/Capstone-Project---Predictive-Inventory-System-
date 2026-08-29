@@ -58,6 +58,7 @@ export default function PurchaseOrdersPage() {
 
     if (isNewPo || productId) {
       setInitialFormValues({
+        branchId: branchIdParam || filters.branchId || defaultBranchId || '',
         supplierId: supplierId || '',
         currencyCode: 'PHP',
         lines: [
@@ -102,7 +103,10 @@ export default function PurchaseOrdersPage() {
   }
 
   const createMutation = useMutation({
-    mutationFn: (values: PurchaseOrderFormValues) => createPurchaseOrder(filters.branchId as string, values),
+    mutationFn: (values: PurchaseOrderFormValues) => {
+      const targetBranchId = values.branchId || (filters.branchId as string)
+      return createPurchaseOrder(targetBranchId, values)
+    },
     onSuccess: () => {
       invalidate()
       handleCloseForm()
@@ -122,12 +126,21 @@ export default function PurchaseOrdersPage() {
   const supplierOptions = supplierOptionsQuery.data ?? []
   const productOptions = productOptionsQuery.data ?? []
   const unitOptions = unitOptionsQuery.data ?? []
+  const branchOptions = session?.user.branches ?? []
 
   const updateFilter = <K extends keyof PurchaseOrderFilters>(key: K, value: PurchaseOrderFilters[K]) => setFilters((state) => ({ ...state, [key]: value, page: key === 'page' ? Number(value) : 1 }))
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Purchase orders" description="Draft, submit, and approve purchase orders for your branch." actions={<Button disabled={!filters.branchId} onClick={() => { setInitialFormValues(undefined); setIsFormOpen(true) }}><FilePlus2 aria-hidden="true" size={18} /> Create purchase order</Button>} />
+      <PageHeader
+        title="Purchase orders to suppliers"
+        description="Create, submit, and track purchase orders and their designated delivery destination (Legazpi Branch or Budiao Warehouse)."
+        actions={
+          <Button disabled={!filters.branchId} onClick={() => { setInitialFormValues(undefined); setIsFormOpen(true) }}>
+            <FilePlus2 aria-hidden="true" size={18} /> Create purchase order
+          </Button>
+        }
+      />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
 
       {/* Relocated Pending Procurement Panel */}
@@ -138,8 +151,26 @@ export default function PurchaseOrdersPage() {
         />
       ) : null}
 
-      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_180px_180px]">
-        <label className="relative block"><span className="sr-only">Search by PO number</span><Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} /><input className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" placeholder="Search by PO number" value={filters.search} onChange={(event: ChangeEvent<HTMLInputElement>) => updateFilter('search', event.target.value)} /></label>
+      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[minmax(0,1fr)_200px_180px_160px]">
+        <label className="relative block">
+          <span className="sr-only">Search by PO number</span>
+          <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
+          <input className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" placeholder="Search by PO number" value={filters.search} onChange={(event: ChangeEvent<HTMLInputElement>) => updateFilter('search', event.target.value)} />
+        </label>
+
+        {/* Facility Destination Filter */}
+        <select
+          className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 font-medium"
+          value={filters.branchId ?? ''}
+          onChange={(event) => updateFilter('branchId', event.target.value)}
+        >
+          {branchOptions.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
+            </option>
+          ))}
+        </select>
+
         <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={filters.supplierId} onChange={(event) => updateFilter('supplierId', event.target.value)}>
           <option value="all">All suppliers</option>
           {supplierOptions.map((option) => <option key={option.id} value={option.id}>{option.legalName}</option>)}
@@ -162,6 +193,8 @@ export default function PurchaseOrdersPage() {
 
       {isFormOpen ? (
         <PurchaseOrderFormDialog
+          branchOptions={branchOptions}
+          defaultBranchId={filters.branchId ?? defaultBranchId}
           initialValues={initialFormValues}
           isSaving={createMutation.isPending}
           productOptions={productOptions}

@@ -43,7 +43,7 @@ class PurchaseOrderController extends Controller
         $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
         $page = max((int) $request->integer('page', 1), 1);
 
-        $query = PurchaseOrder::query()->with('supplier')->where('branch_id', $branchId);
+        $query = PurchaseOrder::query()->with(['supplier', 'branch'])->where('branch_id', $branchId);
 
         if ($request->filled('supplierId')) {
             $query->where('supplier_id', (int) $request->query('supplierId'));
@@ -81,7 +81,6 @@ class PurchaseOrderController extends Controller
     public function store(StorePurchaseOrderRequest $request): JsonResponse
     {
         $validated = $request->validated();
-
         $this->authorize('create', [PurchaseOrder::class, (int) $validated['branchId']]);
 
         try {
@@ -107,14 +106,14 @@ class PurchaseOrderController extends Controller
             return $this->exceptionResponse($exception);
         }
 
-        return (new PurchaseOrderResource($po->load('supplier')))->response()->setStatusCode(201);
+        return (new PurchaseOrderResource($po->load(['supplier', 'branch'])))->response()->setStatusCode(201);
     }
 
     public function show(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource
     {
         $this->authorize('view', $purchaseOrder);
 
-        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'lines', 'approvals']));
+        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'branch', 'lines', 'approvals']));
     }
 
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource|JsonResponse

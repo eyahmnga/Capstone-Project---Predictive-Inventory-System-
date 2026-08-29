@@ -30,6 +30,7 @@ export type PurchaseOrderApproval = {
 export type PurchaseOrder = {
   id: string
   branchId: string
+  branch?: { id: string; code: string; name: string; city?: string | null; province?: string | null } | null
   supplier: { id: string; code: string; legalName: string } | null
   poNumber: string
   status: PurchaseOrderStatus
@@ -69,6 +70,7 @@ export type PurchaseOrderLineInput = {
 }
 
 export type PurchaseOrderFormValues = {
+  branchId?: string
   supplierId: string
   currencyCode: string
   expectedReceiptAt: string

@@ -71,7 +71,18 @@ export default function GoodsReceiptsPage() {
       />
       {error ? <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger-text" role="alert">{error.message}{error.requestId ? ` Request ID: ${error.requestId}` : ''}</div> : null}
 
-      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[180px_minmax(0,1fr)]">
+      <section className="grid gap-3 rounded-card border border-border bg-surface p-4 shadow-panel sm:p-6 md:grid-cols-[200px_180px_minmax(0,1fr)]">
+        <select
+          className="h-11 rounded-xl border border-border bg-surface px-3 text-sm font-medium outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+          value={filters.branchId ?? ''}
+          onChange={(event) => updateFilter('branchId', event.target.value)}
+        >
+          {(session?.user.branches ?? []).map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
+            </option>
+          ))}
+        </select>
         <select className="h-11 rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" value={filters.status} onChange={(event) => updateFilter('status', event.target.value as GoodsReceiptStatus | 'all')}>
           <option value="all">All statuses</option>
           <option value="draft">Draft</option>

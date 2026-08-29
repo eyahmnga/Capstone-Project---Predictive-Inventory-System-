@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Building2, Plus, Trash2, Warehouse, X } from 'lucide-react'
 import type { UnitOption } from '@/features/products/types/product'
 import type { SupplierOption } from '@/features/suppliers/types/supplier'
 import type { PurchaseOrderFormValues, PurchaseOrderLineInput } from '@/features/purchase-orders/types/purchaseOrder'
@@ -12,10 +12,14 @@ import { modalOverlayClass, modalPanelClass, sheetBodyClass, sheetFooterClass, s
 
 type ProductOption = { id: string; sku: string; name: string }
 
+type BranchOption = { id: string; code: string; name: string }
+
 type PurchaseOrderFormDialogProps = {
   supplierOptions: SupplierOption[]
   productOptions: ProductOption[]
   unitOptions: UnitOption[]
+  branchOptions?: BranchOption[]
+  defaultBranchId?: string
   initialValues?: Partial<PurchaseOrderFormValues>
   isSaving: boolean
   onClose: () => void
@@ -28,6 +32,8 @@ export function PurchaseOrderFormDialog({
   supplierOptions,
   productOptions,
   unitOptions,
+  branchOptions = [],
+  defaultBranchId,
   initialValues,
   isSaving,
   onClose,
@@ -35,6 +41,8 @@ export function PurchaseOrderFormDialog({
 }: PurchaseOrderFormDialogProps) {
   const [values, setValues] = useState<PurchaseOrderFormValues>(() => {
     const defaultUnitId = unitOptions[0]?.id ?? ''
+    const effectiveBranchId = initialValues?.branchId || defaultBranchId || branchOptions[0]?.id || ''
+
     if (initialValues) {
       const initialLines =
         initialValues.lines && initialValues.lines.length > 0
@@ -49,6 +57,7 @@ export function PurchaseOrderFormDialog({
           : [{ ...emptyLine, unitId: defaultUnitId }]
 
       return {
+        branchId: effectiveBranchId,
         supplierId: initialValues.supplierId || supplierOptions[0]?.id || '',
         currencyCode: initialValues.currencyCode || 'PHP',
         expectedReceiptAt: initialValues.expectedReceiptAt || '',
@@ -58,6 +67,7 @@ export function PurchaseOrderFormDialog({
       }
     }
     return {
+      branchId: effectiveBranchId,
       supplierId: supplierOptions[0]?.id || '',
       currencyCode: 'PHP',
       expectedReceiptAt: '',
@@ -98,11 +108,12 @@ export function PurchaseOrderFormDialog({
     <Portal>
     <div className={modalOverlayClass} role="presentation">
       <section aria-labelledby="po-form-title" aria-modal="true" className={modalPanelClass('sm:max-w-4xl')} role="dialog">
-        <div className={sheetHeaderClass}><div><h2 id="po-form-title" className="text-lg font-bold text-ink">Create purchase order</h2><p className="mt-1 text-sm text-muted">Totals are calculated by the server once the draft is created.</p></div><Button aria-label="Close dialog" size="icon" variant="ghost" onClick={onClose}><X aria-hidden="true" size={18} /></Button></div>
+        <div className={sheetHeaderClass}><div><h2 id="po-form-title" className="text-lg font-bold text-ink">Create purchase order to supplier</h2><p className="mt-1 text-sm text-muted">Set supplier delivery location and order line items.</p></div><Button aria-label="Close dialog" size="icon" variant="ghost" onClick={onClose}><X aria-hidden="true" size={18} /></Button></div>
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <div className={cn(sheetBodyClass, 'space-y-5')}>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <label className="text-sm font-semibold text-ink sm:col-span-1">Supplier
+            {/* Top Row: Supplier & Delivery Destination */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-ink">Supplier
                 <select className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" required value={values.supplierId} onChange={(event) => {
                   const supplier = supplierOptions.find((option) => option.id === event.target.value)
                   setValues((state) => ({ ...state, supplierId: event.target.value, currencyCode: supplier?.defaultCurrencyCode ?? state.currencyCode }))
@@ -111,13 +122,44 @@ export function PurchaseOrderFormDialog({
                   {supplierOptions.map((option) => <option key={option.id} value={option.id}>{option.legalName}</option>)}
                 </select>
               </label>
+
+              {/* Delivery Destination: Legazpi Branch vs Budiao Warehouse */}
+              <label className="text-sm font-semibold text-ink">
+                Deliver To (Branch / Warehouse)
+                <select
+                  className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+                  required
+                  value={values.branchId}
+                  onChange={(event) => setValues((state) => ({ ...state, branchId: event.target.value }))}
+                >
+                  {branchOptions.length > 0 ? (
+                    branchOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.code === 'BUD-WH' ? '(Budiao, Daraga, Albay)' : '(Legazpi City, Albay)'}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="1">Legazpi Branch (Legazpi City, Albay)</option>
+                      <option value="2">Budiao Warehouse (Budiao, Daraga, Albay)</option>
+                    </>
+                  )}
+                </select>
+                <span className="block mt-1 text-[11px] font-normal text-slate-500">
+                  Where supplier will deliver: Legazpi Branch or Budiao Warehouse
+                </span>
+              </label>
+            </div>
+
+            {/* Second Row: Currency & Expected Receipt Date */}
+            <div className="grid gap-4 sm:grid-cols-2">
               <label className="text-sm font-semibold text-ink">Currency<input className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm uppercase outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" maxLength={3} required value={values.currencyCode} onChange={(event) => setValues((state) => ({ ...state, currencyCode: event.target.value.toUpperCase() }))} /></label>
-              <label className="text-sm font-semibold text-ink">Expected receipt<input className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" type="date" value={values.expectedReceiptAt} onChange={(event) => setValues((state) => ({ ...state, expectedReceiptAt: event.target.value }))} /></label>
+              <label className="text-sm font-semibold text-ink">Expected receipt date<input className="mt-2 h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" type="date" value={values.expectedReceiptAt} onChange={(event) => setValues((state) => ({ ...state, expectedReceiptAt: event.target.value }))} /></label>
             </div>
 
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink">Lines</h3>
+                <h3 className="text-sm font-semibold text-ink">Order Line Items</h3>
                 <Button size="icon" type="button" variant="ghost" onClick={addLine}><Plus aria-hidden="true" size={16} /><span className="sr-only">Add line</span></Button>
               </div>
               <div className="mt-2 space-y-3">
@@ -162,14 +204,14 @@ export function PurchaseOrderFormDialog({
               </div>
             </div>
 
-            <label className="block text-sm font-semibold text-ink">Notes
-              <textarea className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" rows={2} value={values.notes} onChange={(event) => setValues((state) => ({ ...state, notes: event.target.value }))} />
+            <label className="block text-sm font-semibold text-ink">Special Delivery Notes
+              <textarea className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20" placeholder="e.g. Deliver to Gate 2, look for warehouse supervisor..." rows={2} value={values.notes} onChange={(event) => setValues((state) => ({ ...state, notes: event.target.value }))} />
             </label>
           </div>
 
           <div className={sheetFooterClass}>
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button disabled={isSaving || !isValid} type="submit">{isSaving ? 'Saving' : 'Create draft'}</Button>
+            <Button disabled={isSaving || !isValid} type="submit">{isSaving ? 'Saving' : 'Create Purchase Order'}</Button>
           </div>
         </form>
       </section>
