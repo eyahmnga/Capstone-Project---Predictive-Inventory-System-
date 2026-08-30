@@ -3,6 +3,7 @@
 namespace App\Domains\Procurement\Models;
 
 use App\Domains\Identity\Models\Branch;
+use App\Domains\Inventory\Models\GoodsReceipt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -60,5 +61,10 @@ class PurchaseOrder extends Model
     public function approvals(): HasMany
     {
         return $this->hasMany(PurchaseOrderApproval::class);
+    }
+
+    public function goodsReceipts(): HasMany
+    {
+        return $this->hasMany(GoodsReceipt::class);
     }
 }

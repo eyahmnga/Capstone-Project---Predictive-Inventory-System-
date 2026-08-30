@@ -75,6 +75,26 @@ class PurchaseOrderResource extends JsonResource
                 'decisionAt' => $approval->decision_at?->toIso8601String(),
                 'reason' => $approval->reason,
             ])->values() : [],
+            'goodsReceipts' => $po->relationLoaded('goodsReceipts') ? $po->goodsReceipts->map(fn ($gr) => [
+                'id' => (string) $gr->id,
+                'receiptNumber' => $gr->receipt_number,
+                'status' => $gr->status,
+                'supplierDeliveryNumber' => $gr->supplier_delivery_number,
+                'receivedAt' => optional($gr->received_at)->toIso8601String(),
+                'postedAt' => optional($gr->posted_at)->toIso8601String(),
+                'notes' => $gr->notes,
+                'lines' => $gr->relationLoaded('lines') ? $gr->lines->map(fn ($l) => [
+                    'id' => (string) $l->id,
+                    'purchaseOrderLineId' => $l->purchase_order_line_id ? (string) $l->purchase_order_line_id : null,
+                    'productName' => $l->product_name_snapshot,
+                    'productSku' => $l->product_sku_snapshot,
+                    'receivedQuantity' => (string) $l->received_quantity,
+                    'acceptedQuantity' => (string) $l->accepted_quantity,
+                    'rejectedQuantity' => (string) $l->rejected_quantity,
+                    'rejectionReason' => $l->rejection_reason,
+                    'notes' => $l->notes,
+                ])->values() : [],
+            ])->values() : [],
             'version' => $po->row_version,
         ];
     }

@@ -113,7 +113,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('view', $purchaseOrder);
 
-        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'branch', 'lines', 'approvals']));
+        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'branch', 'lines', 'approvals', 'goodsReceipts.lines']));
     }
 
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource|JsonResponse

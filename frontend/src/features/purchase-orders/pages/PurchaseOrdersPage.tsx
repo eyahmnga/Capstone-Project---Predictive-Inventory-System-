@@ -7,6 +7,8 @@ import { useDashboard } from '@/features/dashboard/hooks/useDashboard'
 import { PendingPurchaseOrdersPanel } from '@/features/dashboard/components/PendingPurchaseOrdersPanel'
 import { useProductOptions, useUnitOptions } from '@/features/products/hooks/useProducts'
 import { useSupplierOptions } from '@/features/suppliers/hooks/useSuppliers'
+import { createGoodsReceipt, postGoodsReceipt } from '@/features/receiving/api/goodsReceiptsApi'
+import type { GoodsReceiptFormValues } from '@/features/receiving/types/goodsReceipt'
 import {
   cancelPurchaseOrder,
   closePurchaseOrder,
@@ -20,6 +22,7 @@ import {
 import { PurchaseOrderDetailsDrawer } from '@/features/purchase-orders/components/PurchaseOrderDetailsDrawer'
 import { PurchaseOrderFormDialog } from '@/features/purchase-orders/components/PurchaseOrderFormDialog'
 import { PurchaseOrderTable } from '@/features/purchase-orders/components/PurchaseOrderTable'
+import { ReceiveDeliveryModal } from '@/features/purchase-orders/components/ReceiveDeliveryModal'
 import { usePurchaseOrders } from '@/features/purchase-orders/hooks/usePurchaseOrders'
 import type { PurchaseOrder, PurchaseOrderFilters, PurchaseOrderFormValues, PurchaseOrderStatus } from '@/features/purchase-orders/types/purchaseOrder'
 import { type ApiError } from '@/shared/api/client'
@@ -35,6 +38,7 @@ export default function PurchaseOrdersPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [initialFormValues, setInitialFormValues] = useState<Partial<PurchaseOrderFormValues> | undefined>()
+  const [receivingDeliveryPo, setReceivingDeliveryPo] = useState<PurchaseOrder | undefined>()
   const queryClient = useQueryClient()
 
   const defaultBranchId = (session?.user.branches.find((branch) => branch.isDefault) ?? session?.user.branches[0])?.id
@@ -81,7 +85,11 @@ export default function PurchaseOrdersPage() {
   const supplierOptionsQuery = useSupplierOptions()
   const productOptionsQuery = useProductOptions()
   const unitOptionsQuery = useUnitOptions()
-  const selectedQuery = useQuery({ queryKey: purchaseOrderQueryKeys.detail(selectedId ?? ''), queryFn: () => getPurchaseOrder(selectedId as string), enabled: selectedId !== undefined })
+  const selectedQuery = useQuery({
+    queryKey: purchaseOrderQueryKeys.detail(selectedId ?? ''),
+    queryFn: () => getPurchaseOrder(selectedId as string),
+    enabled: selectedId !== undefined,
+  })
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: purchaseOrderQueryKeys.lists() })
@@ -116,25 +124,50 @@ export default function PurchaseOrdersPage() {
   const decideMutation = useMutation({ mutationFn: ({ po, decision, reason }: { po: PurchaseOrder; decision: 'approved' | 'rejected'; reason?: string }) => decidePurchaseOrder(po, decision, reason), onSuccess: invalidate })
   const orderMutation = useMutation({ mutationFn: (po: PurchaseOrder) => markPurchaseOrderOrdered(po, new Date().toISOString()), onSuccess: invalidate })
   const cancelMutation = useMutation({ mutationFn: ({ po, reason }: { po: PurchaseOrder; reason: string }) => cancelPurchaseOrder(po, reason), onSuccess: invalidate })
-  const closeMutation = useMutation({ mutationFn: (po: PurchaseOrder) => closePurchaseOrder(po), onSuccess: invalidate })
 
-  const isActing = submitMutation.isPending || decideMutation.isPending || orderMutation.isPending || cancelMutation.isPending || closeMutation.isPending
+  const receiveDeliveryMutation = useMutation({
+    mutationFn: async (values: GoodsReceiptFormValues) => {
+      const targetBranchId = receivingDeliveryPo?.branchId || (filters.branchId as string)
+      const draft = await createGoodsReceipt(targetBranchId, values)
+      return await postGoodsReceipt(draft)
+    },
+    onSuccess: () => {
+      invalidate()
+      void queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      void queryClient.invalidateQueries({ queryKey: ['goods-receipts'] })
+      setReceivingDeliveryPo(undefined)
+    },
+  })
+
+  const isActing =
+    submitMutation.isPending ||
+    decideMutation.isPending ||
+    orderMutation.isPending ||
+    cancelMutation.isPending ||
+    receiveDeliveryMutation.isPending
 
   const totalPages = Math.max(1, Math.ceil((poQuery.data?.meta.total ?? 0) / filters.perPage))
-  const error = (createMutation.error ?? submitMutation.error ?? decideMutation.error ?? orderMutation.error ?? cancelMutation.error ?? closeMutation.error ?? poQuery.error) as ApiError | null
+  const error = (createMutation.error ??
+    submitMutation.error ??
+    decideMutation.error ??
+    orderMutation.error ??
+    cancelMutation.error ??
+    receiveDeliveryMutation.error ??
+    poQuery.error) as ApiError | null
   const purchaseOrders = poQuery.data?.data ?? []
   const supplierOptions = supplierOptionsQuery.data ?? []
   const productOptions = productOptionsQuery.data ?? []
   const unitOptions = unitOptionsQuery.data ?? []
   const branchOptions = session?.user.branches ?? []
 
-  const updateFilter = <K extends keyof PurchaseOrderFilters>(key: K, value: PurchaseOrderFilters[K]) => setFilters((state) => ({ ...state, [key]: value, page: key === 'page' ? Number(value) : 1 }))
+  const updateFilter = <K extends keyof PurchaseOrderFilters>(key: K, value: PurchaseOrderFilters[K]) =>
+    setFilters((state) => ({ ...state, [key]: value, page: key === 'page' ? Number(value) : 1 }))
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Purchase orders to suppliers"
-        description="Create, submit, and track purchase orders and their designated delivery destination (Legazpi Branch or Budiao Warehouse)."
+        description="Create, submit, and track supplier deliveries (complete, kulang, or damaged) and delivery destinations."
         actions={
           <Button disabled={!filters.branchId} onClick={() => { setInitialFormValues(undefined); setIsFormOpen(true) }}>
             <FilePlus2 aria-hidden="true" size={18} /> Create purchase order
@@ -148,6 +181,7 @@ export default function PurchaseOrdersPage() {
         <PendingPurchaseOrdersPanel
           count={dashboardQuery.data.data.pendingPurchaseOrders.count}
           items={dashboardQuery.data.data.pendingPurchaseOrders.items}
+          onSelectPo={(id) => setSelectedId(id)}
         />
       ) : null}
 
@@ -181,13 +215,19 @@ export default function PurchaseOrdersPage() {
           <option value="submitted">Submitted</option>
           <option value="approved">Approved</option>
           <option value="ordered">Ordered</option>
+          <option value="partially_received">Partially received</option>
+          <option value="received">Received</option>
           <option value="cancelled">Cancelled</option>
           <option value="closed">Closed</option>
         </select>
       </section>
 
       <div className="flex items-center justify-between text-sm text-muted"><p>{poQuery.data?.meta.total ?? 0} purchase orders</p><p>{poQuery.isFetching ? 'Updating…' : 'Server pagination enabled'}</p></div>
-      <PurchaseOrderTable purchaseOrders={purchaseOrders} onView={(po) => setSelectedId(po.id)} />
+      <PurchaseOrderTable
+        purchaseOrders={purchaseOrders}
+        onView={(po) => setSelectedId(po.id)}
+        onReceiveDelivery={(po) => setReceivingDeliveryPo(po)}
+      />
 
       <nav aria-label="Purchase order pagination" className="flex items-center justify-between gap-3"><p className="text-sm text-muted">Page {filters.page} of {totalPages}</p><div className="flex gap-2"><Button disabled={filters.page <= 1} variant="secondary" onClick={() => updateFilter('page', filters.page - 1)}>Previous</Button><Button disabled={filters.page >= totalPages} variant="secondary" onClick={() => updateFilter('page', filters.page + 1)}>Next</Button></div></nav>
 
@@ -204,6 +244,7 @@ export default function PurchaseOrdersPage() {
           onSave={(values) => createMutation.mutate(values)}
         />
       ) : null}
+
       {selectedQuery.data ? (
         <PurchaseOrderDetailsDrawer
           isActing={isActing}
@@ -211,10 +252,19 @@ export default function PurchaseOrdersPage() {
           onApprove={() => decideMutation.mutate({ po: selectedQuery.data, decision: 'approved' })}
           onCancel={(reason) => cancelMutation.mutate({ po: selectedQuery.data, reason })}
           onClose={() => setSelectedId(undefined)}
-          onClosePo={() => closeMutation.mutate(selectedQuery.data)}
           onMarkOrdered={() => orderMutation.mutate(selectedQuery.data)}
           onReject={(reason) => decideMutation.mutate({ po: selectedQuery.data, decision: 'rejected', reason })}
           onSubmit={() => submitMutation.mutate(selectedQuery.data)}
+          onOpenReceiveDelivery={() => setReceivingDeliveryPo(selectedQuery.data)}
+        />
+      ) : null}
+
+      {receivingDeliveryPo ? (
+        <ReceiveDeliveryModal
+          purchaseOrder={receivingDeliveryPo}
+          isSubmitting={receiveDeliveryMutation.isPending}
+          onClose={() => setReceivingDeliveryPo(undefined)}
+          onConfirm={(values) => receiveDeliveryMutation.mutate(values)}
         />
       ) : null}
     </div>

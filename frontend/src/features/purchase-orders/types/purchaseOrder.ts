@@ -27,6 +27,27 @@ export type PurchaseOrderApproval = {
   reason: string | null
 }
 
+export type PurchaseOrderGoodsReceipt = {
+  id: string
+  receiptNumber: string
+  status: string
+  supplierDeliveryNumber: string | null
+  receivedAt: string | null
+  postedAt: string | null
+  notes: string | null
+  lines: Array<{
+    id: string
+    purchaseOrderLineId: string | null
+    productName: string
+    productSku: string
+    receivedQuantity: string
+    acceptedQuantity: string
+    rejectedQuantity: string
+    rejectionReason: string | null
+    notes: string | null
+  }>
+}
+
 export type PurchaseOrder = {
   id: string
   branchId: string
@@ -48,6 +69,7 @@ export type PurchaseOrder = {
   notes: string | null
   lines: PurchaseOrderLine[]
   approvals: PurchaseOrderApproval[]
+  goodsReceipts?: PurchaseOrderGoodsReceipt[]
   version: number
 }
 
