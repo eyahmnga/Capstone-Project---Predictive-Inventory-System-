@@ -43,7 +43,7 @@ class PurchaseOrderController extends Controller
         $perPage = min(max((int) $request->integer('perPage', 20), 1), 100);
         $page = max((int) $request->integer('page', 1), 1);
 
-        $query = PurchaseOrder::query()->with(['supplier', 'branch'])->where('branch_id', $branchId);
+        $query = PurchaseOrder::query()->with(['supplier', 'branch', 'lines', 'goodsReceipts.lines'])->where('branch_id', $branchId);
 
         if ($request->filled('supplierId')) {
             $query->where('supplier_id', (int) $request->query('supplierId'));

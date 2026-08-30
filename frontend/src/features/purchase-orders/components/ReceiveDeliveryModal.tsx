@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { AlertCircle, AlertTriangle, Building2, CheckCircle2, PackageCheck, Truck, Warehouse, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Building2, CheckCircle2, Loader2, PackageCheck, Truck, Warehouse, X } from 'lucide-react'
 import type { PurchaseOrder, PurchaseOrderLine } from '@/features/purchase-orders/types/purchaseOrder'
+import { usePurchaseOrder } from '@/features/purchase-orders/hooks/usePurchaseOrders'
 import type { GoodsReceiptFormValues, GoodsReceiptLineInput } from '@/features/receiving/types/goodsReceipt'
 import { Button } from '@/shared/components/Button'
 import { Portal } from '@/shared/components/Portal'
@@ -36,20 +37,33 @@ function initLine(line: PurchaseOrderLine): GoodsReceiptLineInput {
 }
 
 export function ReceiveDeliveryModal({
-  purchaseOrder: po,
+  purchaseOrder: initialPo,
   isSubmitting,
   onClose,
   onConfirm,
 }: ReceiveDeliveryModalProps) {
+  const poQuery = usePurchaseOrder(initialPo.id)
+  const po = poQuery.data ?? initialPo
+
   const [deliveryPreset, setDeliveryPreset] = useState<DeliveryPreset>('complete')
   const [supplierDeliveryNumber, setSupplierDeliveryNumber] = useState('')
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10))
   const [deliveryNotes, setDeliveryNotes] = useState('Complete and inspected in good condition.')
   const [lines, setLines] = useState<GoodsReceiptLineInput[]>(() =>
-    po.lines
-      .filter((line) => Number(line.orderedQuantity) - Number(line.receivedQuantity) > 0)
+    (po.lines || [])
+      .filter((line) => Math.max(0, Number(line.orderedQuantity) - Number(line.receivedQuantity)) > 0)
       .map(initLine),
   )
+
+  // Sync lines when po detail query returns full lines
+  useEffect(() => {
+    if (po.lines && po.lines.length > 0) {
+      const receivableLines = po.lines
+        .filter((line) => Math.max(0, Number(line.orderedQuantity) - Number(line.receivedQuantity)) > 0)
+        .map(initLine)
+      setLines(receivableLines)
+    }
+  }, [po.lines])
 
   const destinationName = po.branch?.name || (po.branch?.code === 'BUD-WH' ? 'Budiao Warehouse' : 'Legazpi Branch')
   const isWarehouse = destinationName.toLowerCase().includes('warehouse') || po.branch?.code === 'BUD-WH'
@@ -282,114 +296,125 @@ export function ReceiveDeliveryModal({
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                   Delivered Items Inspection
                 </h3>
-                <div className="space-y-3">
-                  {lines.map((line, index) => {
-                    const remNum = Number(line.remainingQuantity) || 0
-                    const accNum = Number(cleanNumericInput(line.acceptedQuantity)) || 0
-                    const rejNum = Number(cleanNumericInput(line.rejectedQuantity)) || 0
-                    const isFullyAccepted = accNum === remNum && rejNum === 0
-                    const isPartiallyAccepted = accNum > 0 && accNum < remNum
-                    const hasRejection = rejNum > 0
 
-                    return (
-                      <div
-                        key={line.purchaseOrderLineId}
-                        className={`rounded-xl border p-3.5 space-y-3 transition ${
-                          hasRejection
-                            ? 'border-rose-300 bg-rose-50/30'
-                            : isPartiallyAccepted
-                            ? 'border-amber-300 bg-amber-50/20'
-                            : 'border-border bg-white'
-                        }`}
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                          <div>
-                            <p className="font-bold text-sm text-ink">{line.productName}</p>
-                            <p className="font-mono text-xs text-muted">{line.productSku}</p>
+                {poQuery.isLoading && lines.length === 0 ? (
+                  <div className="flex items-center justify-center p-8 rounded-xl border border-dashed border-slate-200 text-sm text-muted">
+                    <Loader2 className="animate-spin mr-2" size={16} /> Loading order line items…
+                  </div>
+                ) : lines.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-xs text-muted text-center">
+                    All ordered items on this purchase order have already been delivered and recorded.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {lines.map((line, index) => {
+                      const remNum = Number(line.remainingQuantity) || 0
+                      const accNum = Number(cleanNumericInput(line.acceptedQuantity)) || 0
+                      const rejNum = Number(cleanNumericInput(line.rejectedQuantity)) || 0
+                      const isFullyAccepted = accNum === remNum && rejNum === 0
+                      const isPartiallyAccepted = accNum > 0 && accNum < remNum
+                      const hasRejection = rejNum > 0
+
+                      return (
+                        <div
+                          key={line.purchaseOrderLineId}
+                          className={`rounded-xl border p-3.5 space-y-3 transition ${
+                            hasRejection
+                              ? 'border-rose-300 bg-rose-50/30'
+                              : isPartiallyAccepted
+                              ? 'border-amber-300 bg-amber-50/20'
+                              : 'border-border bg-white'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                            <div>
+                              <p className="font-bold text-sm text-ink">{line.productName}</p>
+                              <p className="font-mono text-xs text-muted">{line.productSku}</p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-slate-500">
+                                Pending Order: <strong className="text-ink font-mono">{formatQuantity(line.remainingQuantity)} pcs</strong>
+                              </span>
+                              {isFullyAccepted ? (
+                                <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 font-bold text-[10px]">
+                                  Full Delivery
+                                </span>
+                              ) : hasRejection ? (
+                                <span className="rounded-full bg-rose-100 text-rose-800 px-2 py-0.5 font-bold text-[10px]">
+                                  With Damaged Items
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-bold text-[10px]">
+                                  Partial Delivery
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-500">
-                              Pending Order: <strong className="text-ink font-mono">{formatQuantity(line.remainingQuantity)} pcs</strong>
-                            </span>
-                            {isFullyAccepted ? (
-                              <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 font-bold text-[10px]">
-                                Full Delivery
-                              </span>
-                            ) : hasRejection ? (
-                              <span className="rounded-full bg-rose-100 text-rose-800 px-2 py-0.5 font-bold text-[10px]">
-                                With Damaged Items
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-bold text-[10px]">
-                                Partial Delivery
-                              </span>
-                            )}
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-                          <label className="text-xs font-semibold text-slate-700">
-                            Delivered Quantity (Total)
-                            <input
-                              className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-xs font-mono outline-none focus:border-brand-600"
-                              min="0"
-                              max={line.remainingQuantity}
-                              required
-                              step="any"
-                              type="number"
-                              value={line.receivedQuantity}
-                              onChange={(e) => updateLine(index, { receivedQuantity: e.target.value })}
-                            />
-                          </label>
-
-                          <label className="text-xs font-semibold text-emerald-800">
-                            Accepted (Add to Stock)
-                            <input
-                              className="mt-1 h-9 w-full rounded-lg border border-emerald-300 bg-emerald-50/40 px-2.5 text-xs font-mono font-bold text-emerald-900 outline-none focus:border-emerald-600"
-                              min="0"
-                              max={line.remainingQuantity}
-                              required
-                              step="any"
-                              type="number"
-                              value={line.acceptedQuantity}
-                              onChange={(e) => updateLine(index, { acceptedQuantity: e.target.value })}
-                            />
-                          </label>
-
-                          <label className="text-xs font-semibold text-rose-800">
-                            Damaged / Rejected Qty
-                            <input
-                              className="mt-1 h-9 w-full rounded-lg border border-rose-300 bg-rose-50/40 px-2.5 text-xs font-mono font-bold text-rose-900 outline-none focus:border-rose-600"
-                              min="0"
-                              max={line.remainingQuantity}
-                              required
-                              step="any"
-                              type="number"
-                              value={line.rejectedQuantity}
-                              onChange={(e) => updateLine(index, { rejectedQuantity: e.target.value })}
-                            />
-                          </label>
-                        </div>
-
-                        {/* Damage Reason Input if rejected > 0 */}
-                        {Number(cleanNumericInput(line.rejectedQuantity)) > 0 ? (
-                          <div className="pt-2 border-t border-rose-100">
-                            <label className="block text-xs font-bold text-rose-900">
-                              Damage / Rejection Reason (Required)
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+                            <label className="text-xs font-semibold text-slate-700">
+                              Delivered Quantity (Total)
                               <input
-                                className="mt-1 h-9 w-full rounded-lg border border-rose-300 bg-white px-2.5 text-xs outline-none focus:border-rose-600"
-                                placeholder="e.g. Basag ang container / Defective nozzle / Expired packaging"
+                                className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-xs font-mono outline-none focus:border-brand-600"
+                                min="0"
+                                max={line.remainingQuantity}
                                 required
-                                value={line.rejectionReason}
-                                onChange={(e) => updateLine(index, { rejectionReason: e.target.value })}
+                                step="any"
+                                type="number"
+                                value={line.receivedQuantity}
+                                onChange={(e) => updateLine(index, { receivedQuantity: e.target.value })}
+                              />
+                            </label>
+
+                            <label className="text-xs font-semibold text-emerald-800">
+                              Accepted (Add to Stock)
+                              <input
+                                className="mt-1 h-9 w-full rounded-lg border border-emerald-300 bg-emerald-50/40 px-2.5 text-xs font-mono font-bold text-emerald-900 outline-none focus:border-emerald-600"
+                                min="0"
+                                max={line.remainingQuantity}
+                                required
+                                step="any"
+                                type="number"
+                                value={line.acceptedQuantity}
+                                onChange={(e) => updateLine(index, { acceptedQuantity: e.target.value })}
+                              />
+                            </label>
+
+                            <label className="text-xs font-semibold text-rose-800">
+                              Damaged / Rejected Qty
+                              <input
+                                className="mt-1 h-9 w-full rounded-lg border border-rose-300 bg-rose-50/40 px-2.5 text-xs font-mono font-bold text-rose-900 outline-none focus:border-rose-600"
+                                min="0"
+                                max={line.remainingQuantity}
+                                required
+                                step="any"
+                                type="number"
+                                value={line.rejectedQuantity}
+                                onChange={(e) => updateLine(index, { rejectedQuantity: e.target.value })}
                               />
                             </label>
                           </div>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
+
+                          {/* Damage Reason Input if rejected > 0 */}
+                          {Number(cleanNumericInput(line.rejectedQuantity)) > 0 ? (
+                            <div className="pt-2 border-t border-rose-100">
+                              <label className="block text-xs font-bold text-rose-900">
+                                Damage / Rejection Reason (Required)
+                                <input
+                                  className="mt-1 h-9 w-full rounded-lg border border-rose-300 bg-white px-2.5 text-xs outline-none focus:border-rose-600"
+                                  placeholder="e.g. Basag ang container / Defective nozzle / Expired packaging"
+                                  required
+                                  value={line.rejectionReason}
+                                  onChange={(e) => updateLine(index, { rejectionReason: e.target.value })}
+                                />
+                              </label>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Delivery Inspection Notes & Remarks */}
