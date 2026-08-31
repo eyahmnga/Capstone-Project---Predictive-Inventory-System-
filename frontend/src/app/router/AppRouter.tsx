@@ -23,6 +23,7 @@ const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'))
 const AuditPage = lazy(() => import('@/features/audit/pages/AuditPage'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'))
 const SyncQueuePage = lazy(() => import('@/features/sync/pages/SyncQueuePage'))
+const BudiaoWarehousePage = lazy(() => import('@/features/warehouse/pages/BudiaoWarehousePage'))
 const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'))
 const NotFoundPage = lazy(() => import('@/app/router/NotFoundPage'))
 
@@ -46,6 +47,7 @@ export function AppRouter() {
                 <Route path="/suppliers" element={<SuppliersPage />} />
                 <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
                 <Route path="/goods-receipts" element={<GoodsReceiptsPage />} />
+                <Route path="/budiao-warehouse" element={<BudiaoWarehousePage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/pos" element={<PosPage />} />
                 <Route path="/sales" element={<SalesPage />} />

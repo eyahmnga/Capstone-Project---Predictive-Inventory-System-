@@ -12,6 +12,7 @@ export type AppRoutePath =
   | '/suppliers'
   | '/purchase-orders'
   | '/goods-receipts'
+  | '/budiao-warehouse'
   | '/forecasting'
   | '/restocking'
   | '/reports'

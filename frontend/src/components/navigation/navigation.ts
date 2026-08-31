@@ -97,6 +97,12 @@ export const sidebarNavigation: SidebarNavigationConfig = {
               to: '/goods-receipts',
               permission: 'goods_receipts.read',
             },
+            {
+              key: 'budiao-warehouse',
+              label: 'Budiao Warehouse Hub',
+              to: '/budiao-warehouse',
+              permission: 'goods_receipts.read',
+            },
           ],
         },
       ],
