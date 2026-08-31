@@ -28,15 +28,19 @@ class DemoDataSeeder extends Seeder
             return;
         }
 
-        $branch = Branch::query()->where('code', 'MAIN')->firstOrFail();
+        $mainBranch = Branch::query()->where('code', 'MAIN')->firstOrFail();
+        $budiaoBranch = Branch::query()->where('code', 'BUD-WH')->first();
         $units = UnitOfMeasure::query()->get()->keyBy('code');
 
-        $users = $this->seedDemoUsers($branch);
+        $users = $this->seedDemoUsers($mainBranch);
         $categories = $this->seedCategories();
         $suppliers = $this->seedSuppliers();
         $products = $this->seedProducts($categories, $units);
 
-        $this->seedInitialStockBalances($branch, $products);
+        $this->seedInitialStockBalances($mainBranch, $products, '20.0000');
+        if ($budiaoBranch) {
+            $this->seedInitialStockBalances($budiaoBranch, $products, '80.0000');
+        }
     }
 
     /**
@@ -228,14 +232,14 @@ class DemoDataSeeder extends Seeder
      *
      * @param array<string, Product> $products
      */
-    private function seedInitialStockBalances(Branch $branch, array $products): void
+    private function seedInitialStockBalances(Branch $branch, array $products, string $initialQty = '20.0000'): void
     {
         foreach ($products as $product) {
             InventoryBalance::query()->updateOrCreate(
                 ['branch_id' => $branch->id, 'product_id' => $product->id],
                 [
-                    'on_hand_quantity' => '20.0000',
-                    'available_quantity' => '20.0000',
+                    'on_hand_quantity' => $initialQty,
+                    'available_quantity' => $initialQty,
                     'reserved_quantity' => '0.0000',
                     'incoming_quantity' => '0.0000',
                     'last_movement_at' => null,

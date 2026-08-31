@@ -100,3 +100,33 @@ export async function reverseInventoryAdjustment(adjustment: InventoryAdjustment
   )
   return response.data.data
 }
+
+export type StockTransferValues = {
+  fromBranchId: string
+  toBranchId: string
+  lines: Array<{
+    productId: string
+    quantity: number
+  }>
+  notes?: string
+}
+
+export type StockTransferResult = {
+  transferReference: string
+  fromBranch: { id: string; name: string }
+  toBranch: { id: string; name: string }
+  transferredAt: string
+  notes?: string | null
+  items: Array<{
+    productId: string
+    sku: string
+    name: string
+    quantity: string
+  }>
+}
+
+export async function transferInventory(values: StockTransferValues): Promise<StockTransferResult> {
+  const response = await apiClient.post<ApiEnvelope<StockTransferResult>>('/inventory/transfers', values)
+  return response.data.data
+}
+

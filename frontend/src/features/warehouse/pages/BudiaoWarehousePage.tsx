@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Boxes,
   Building2,
   CheckCircle2,
@@ -13,12 +14,13 @@ import {
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
-import { getInventoryBalances, inventoryQueryKeys } from '@/features/inventory/api/inventoryApi'
+import { getInventoryBalances, inventoryQueryKeys, transferInventory, type StockTransferValues } from '@/features/inventory/api/inventoryApi'
 import { getPurchaseOrders, purchaseOrderQueryKeys } from '@/features/purchase-orders/api/purchaseOrdersApi'
 import { getGoodsReceipts, goodsReceiptQueryKeys, createGoodsReceipt, postGoodsReceipt } from '@/features/receiving/api/goodsReceiptsApi'
 import type { PurchaseOrder } from '@/features/purchase-orders/types/purchaseOrder'
 import type { GoodsReceiptFormValues } from '@/features/receiving/types/goodsReceipt'
 import { ReceiveDeliveryModal } from '@/features/purchase-orders/components/ReceiveDeliveryModal'
+import { TransferStockModal } from '@/features/warehouse/components/TransferStockModal'
 import { PurchaseOrderStatusBadge } from '@/features/purchase-orders/components/PurchaseOrderStatusBadge'
 import { Button } from '@/shared/components/Button'
 import { PageHeader } from '@/shared/components/PageHeader'
@@ -33,6 +35,7 @@ export default function BudiaoWarehousePage() {
   const [activeTab, setActiveTab] = useState<TabType>('incoming')
   const [search, setSearch] = useState('')
   const [receivingPo, setReceivingPo] = useState<PurchaseOrder | undefined>()
+  const [isTransferOpen, setIsTransferOpen] = useState(false)
 
   // Locate Budiao Warehouse branch ID dynamically
   const budiaoBranch =
@@ -77,6 +80,18 @@ export default function BudiaoWarehousePage() {
     },
   })
 
+  const transferMutation = useMutation({
+    mutationFn: async (values: StockTransferValues) => {
+      return await transferInventory(values)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['inventory-balances'] })
+      void queryClient.invalidateQueries({ queryKey: ['inventory-movements'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setIsTransferOpen(false)
+    },
+  })
+
   const purchaseOrders = poQuery.data?.data ?? []
   const goodsReceipts = receiptsQuery.data?.data ?? []
   const stockBalances = stockQuery.data?.data ?? []
@@ -95,6 +110,13 @@ export default function BudiaoWarehousePage() {
         description="Monitor and detect incoming supplier deliveries, record received goods, and track live warehouse stock in Budiao, Daraga, Albay."
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs"
+              onClick={() => setIsTransferOpen(true)}
+            >
+              <ArrowRightLeft size={15} />
+              Transfer Stock to Store
+            </Button>
             <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs">
               <Warehouse size={16} className="text-amber-700" />
               Budiao Warehouse (BUD-WH)
@@ -427,6 +449,18 @@ export default function BudiaoWarehousePage() {
           isSubmitting={receiveMutation.isPending}
           onClose={() => setReceivingPo(undefined)}
           onConfirm={(values) => receiveMutation.mutate(values)}
+        />
+      )}
+
+      {/* Transfer Stock Modal */}
+      {isTransferOpen && (
+        <TransferStockModal
+          sourceBalances={stockBalances}
+          defaultFromBranchId={branchId}
+          defaultToBranchId="1"
+          isSubmitting={transferMutation.isPending}
+          onClose={() => setIsTransferOpen(false)}
+          onConfirm={(values) => transferMutation.mutate(values)}
         />
       )}
     </div>

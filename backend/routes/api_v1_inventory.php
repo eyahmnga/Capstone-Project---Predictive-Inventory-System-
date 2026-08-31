@@ -3,10 +3,12 @@
 use App\Http\Controllers\Api\V1\InventoryAdjustmentController;
 use App\Http\Controllers\Api\V1\InventoryBalanceController;
 use App\Http\Controllers\Api\V1\InventoryMovementController;
+use App\Http\Controllers\Api\V1\InventoryTransferController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/inventory/balances', [InventoryBalanceController::class, 'index']);
 Route::get('/inventory/movements', [InventoryMovementController::class, 'index']);
+Route::post('/inventory/transfers', [InventoryTransferController::class, 'store']);
 
 Route::get('/inventory/adjustments', [InventoryAdjustmentController::class, 'index']);
 Route::post('/inventory/adjustments', [InventoryAdjustmentController::class, 'store']);

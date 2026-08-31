@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PackagePlus } from 'lucide-react'
+import { ArrowRightLeft, PackagePlus } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthProvider'
@@ -11,7 +11,10 @@ import {
   inventoryQueryKeys,
   postInventoryAdjustment,
   reverseInventoryAdjustment,
+  transferInventory,
+  type StockTransferValues,
 } from '@/features/inventory/api/inventoryApi'
+import { TransferStockModal } from '@/features/warehouse/components/TransferStockModal'
 import { AdjustmentDetailsDrawer } from '@/features/inventory/components/AdjustmentDetailsDrawer'
 import { AdjustmentFormDialog } from '@/features/inventory/components/AdjustmentFormDialog'
 import { AdjustmentTable } from '@/features/inventory/components/AdjustmentTable'
@@ -158,8 +161,18 @@ export default function InventoryPage() {
     onSuccess: (adjustment) => { invalidate(); toast({ title: 'Adjustment reversed', description: adjustment.adjustmentNumber, variant: 'success' }) },
   })
 
-  const isActing = approveMutation.isPending || postMutation.isPending || reverseMutation.isPending
-  const error = (createMutation.error ?? approveMutation.error ?? postMutation.error ?? reverseMutation.error) as ApiError | null
+  const [isTransferOpen, setIsTransferOpen] = useState(false)
+  const transferMutation = useMutation({
+    mutationFn: async (values: StockTransferValues) => transferInventory(values),
+    onSuccess: () => {
+      invalidate()
+      setIsTransferOpen(false)
+      toast({ title: 'Stock transfer completed', description: 'Inventory balances updated successfully.', variant: 'success' })
+    },
+  })
+
+  const isActing = approveMutation.isPending || postMutation.isPending || reverseMutation.isPending || transferMutation.isPending
+  const error = (createMutation.error ?? approveMutation.error ?? postMutation.error ?? reverseMutation.error ?? transferMutation.error) as ApiError | null
 
   const branchId = balanceFilters.branchId
 
@@ -199,9 +212,21 @@ export default function InventoryPage() {
       <PageHeader
         title="Inventory"
         description="Monitor stock, review movement history, and manage inventory adjustments for your branch."
-        actions={tab === 'adjustments' && hasPermission('inventory.adjustments.create') ? (
-          <Button disabled={!branchId} onClick={() => { setQueuedMessage(null); setIsFormOpen(true) }}><PackagePlus aria-hidden="true" size={18} /> Create adjustment</Button>
-        ) : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsTransferOpen(true)}
+            >
+              <ArrowRightLeft size={16} /> Transfer stock
+            </Button>
+            {tab === 'adjustments' && hasPermission('inventory.adjustments.create') && (
+              <Button disabled={!branchId} onClick={() => { setQueuedMessage(null); setIsFormOpen(true) }}>
+                <PackagePlus aria-hidden="true" size={18} /> Create adjustment
+              </Button>
+            )}
+          </div>
+        }
       />
       {!isOnline ? <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-text" role="status">You are offline. Adjustment drafts you create now will queue and sync automatically once connectivity returns.</div> : null}
       {queuedMessage ? <div className="rounded-xl border border-info/30 bg-info/10 px-4 py-3 text-sm text-info-text" role="status">{queuedMessage}</div> : null}
@@ -284,6 +309,16 @@ export default function InventoryPage() {
           onReverse={(reason) => reverseMutation.mutate({ adjustment: selectedAdjustmentQuery.data, reason })}
         />
       ) : null}
+      {isTransferOpen && (
+        <TransferStockModal
+          sourceBalances={balancesQuery.data?.data ?? []}
+          defaultFromBranchId="2"
+          defaultToBranchId="1"
+          isSubmitting={transferMutation.isPending}
+          onClose={() => setIsTransferOpen(false)}
+          onConfirm={(values) => transferMutation.mutate(values)}
+        />
+      )}
     </div>
   )
 }
