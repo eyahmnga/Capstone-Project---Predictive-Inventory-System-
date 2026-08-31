@@ -304,6 +304,7 @@ export default function PosPage() {
               totalDue={totals.total}
               onAdd={cart.addPayment}
               onRemove={cart.removePayment}
+              onSetQuickCash={cart.setQuickCashPayment}
               onUpdate={cart.updatePayment}
             />
 

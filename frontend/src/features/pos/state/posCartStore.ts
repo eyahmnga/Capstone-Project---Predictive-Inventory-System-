@@ -34,7 +34,8 @@ type PosCartState = {
   setDiscount: (productId: string, discountAmount: string) => void
   setOverrideReason: (productId: string, reason: string) => void
   removeLine: (productId: string) => void
-  addPayment: () => void
+  addPayment: (initial?: Partial<Omit<CartPayment, 'localId'>>) => void
+  setQuickCashPayment: (amount: string, method?: PaymentMethod) => void
   updatePayment: (localId: string, patch: Partial<Omit<CartPayment, 'localId'>>) => void
   removePayment: (localId: string) => void
   holdCurrentOrder: (customTag?: string) => void
@@ -124,18 +125,45 @@ export const usePosCartStore = create<PosCartState>()((set, get) => ({
   removeLine: (productId) =>
     set((state) => ({ lines: state.lines.filter((line) => line.productId !== productId) })),
 
-  addPayment: () =>
+  addPayment: (initial) =>
     set((state) => ({
       payments: [
         ...state.payments,
         {
           localId: crypto.randomUUID(),
-          paymentMethod: 'cash' as PaymentMethod,
-          amount: '',
-          externalReference: '',
+          paymentMethod: initial?.paymentMethod || ('cash' as PaymentMethod),
+          amount: initial?.amount ?? '',
+          externalReference: initial?.externalReference ?? '',
         },
       ],
     })),
+
+  setQuickCashPayment: (amount, method = 'cash') =>
+    set((state) => {
+      if (state.payments.length > 0) {
+        return {
+          payments: state.payments.map((payment, index) =>
+            index === 0
+              ? {
+                  ...payment,
+                  amount,
+                  paymentMethod: payment.paymentMethod || method,
+                }
+              : payment,
+          ),
+        }
+      }
+      return {
+        payments: [
+          {
+            localId: crypto.randomUUID(),
+            paymentMethod: method,
+            amount,
+            externalReference: '',
+          },
+        ],
+      }
+    }),
 
   updatePayment: (localId, patch) =>
     set((state) => ({

@@ -1,15 +1,17 @@
 import { Banknote, Coins, Plus, Trash2 } from 'lucide-react'
 import { PAYMENT_METHODS } from '@/features/sales/types/sale'
 import type { CartPayment } from '@/features/pos/types/pos'
+import type { PaymentMethod } from '@/features/sales/types/sale'
 import { Button } from '@/shared/components/Button'
 import { formatCurrency } from '@/shared/lib/formatters'
 
 type PaymentsPanelProps = {
   payments: CartPayment[]
   totalDue: number
-  onAdd: () => void
+  onAdd: (initial?: Partial<Omit<CartPayment, 'localId'>>) => void
   onUpdate: (localId: string, patch: Partial<Omit<CartPayment, 'localId'>>) => void
   onRemove: (localId: string) => void
+  onSetQuickCash?: (amount: string, method?: PaymentMethod) => void
 }
 
 const PREDEFINED_AMOUNTS = [10, 20, 50, 100, 200, 300, 400, 500, 1000] as const
@@ -20,29 +22,42 @@ export function PaymentsPanel({
   onAdd,
   onUpdate,
   onRemove,
+  onSetQuickCash,
 }: PaymentsPanelProps) {
-  // Handle clicking a predefined denomination button
+  // Handle clicking a predefined denomination button with 1 single click
   const handlePredefinedAmountClick = (amount: number) => {
+    const amountStr = amount.toFixed(2)
+    if (onSetQuickCash) {
+      onSetQuickCash(amountStr, 'cash')
+      return
+    }
     const firstPayment = payments[0]
     if (firstPayment) {
       onUpdate(firstPayment.localId, {
-        amount: amount.toFixed(2),
+        amount: amountStr,
         paymentMethod: firstPayment.paymentMethod || 'cash',
       })
     } else {
-      onAdd()
+      onAdd({ amount: amountStr, paymentMethod: 'cash' })
     }
   }
 
+  // Handle clicking Exact button with 1 single click
   const handleExactAmountClick = () => {
     if (totalDue <= 0) return
+    const exactStr = totalDue.toFixed(2)
+    if (onSetQuickCash) {
+      onSetQuickCash(exactStr, 'cash')
+      return
+    }
     const firstPayment = payments[0]
     if (firstPayment) {
       onUpdate(firstPayment.localId, {
-        amount: totalDue.toFixed(2),
+        amount: exactStr,
+        paymentMethod: firstPayment.paymentMethod || 'cash',
       })
     } else {
-      onAdd()
+      onAdd({ amount: exactStr, paymentMethod: 'cash' })
     }
   }
 
@@ -88,7 +103,11 @@ export function PaymentsPanel({
             )
           })}
           <button
-            className="rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 py-1 text-[11px] font-bold transition active:scale-95 shadow-2xs cursor-pointer"
+            className={`rounded-lg border py-1 text-[11px] font-bold transition active:scale-95 shadow-2xs cursor-pointer ${
+              payments.length === 1 && totalDue > 0 && Math.abs(Number(payments[0].amount) - totalDue) < 0.01
+                ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            }`}
             disabled={totalDue <= 0}
             title="Set exact total due"
             type="button"
@@ -108,7 +127,7 @@ export function PaymentsPanel({
           <button
             className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:text-brand-800 transition cursor-pointer"
             type="button"
-            onClick={onAdd}
+            onClick={() => onAdd()}
           >
             <Plus size={12} />
             Split payment
